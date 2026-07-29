@@ -65,7 +65,7 @@ export function ImportTranscriptDialog({
             id="import-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Phoenix weekly program review"
+            placeholder="e.g. Weekly program review"
           />
         </div>
         <div>

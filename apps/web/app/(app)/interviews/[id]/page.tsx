@@ -11,6 +11,7 @@ import {
   Card,
   CardSkeleton,
   Dialog,
+  ErrorState,
   InfoNote,
   Spinner,
   Textarea,
@@ -96,20 +97,23 @@ export default function InterviewWorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.status === "draft"]);
 
+  // ERROR-FIRST: TanStack v5 keeps `isLoading` true alongside `isError` once a
+  // query has settled with no cached data, so isError must be checked first
+  // or a failed load renders as a permanent skeleton.
+  if (query.isError) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <ErrorState
+          message="This interview could not be loaded. Anonymous interviews are only reachable from the browser session that created them (via the receipt token)."
+          onRetry={() => query.refetch()}
+        />
+      </div>
+    );
+  }
   if (query.isLoading || !session) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
         <CardSkeleton rows={4} />
-      </div>
-    );
-  }
-  if (query.isError) {
-    return (
-      <div className="mx-auto max-w-3xl">
-        <Card className="p-6 text-center text-sm text-ink-2">
-          This interview could not be loaded. Anonymous interviews are only reachable from the
-          browser session that created them (via the receipt token).
-        </Card>
       </div>
     );
   }

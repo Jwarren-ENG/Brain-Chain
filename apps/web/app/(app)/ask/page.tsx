@@ -2,10 +2,10 @@
 
 import { DocumentDrawer } from "@/components/document";
 import { EvidencePanel, SEGMENT_META, SegmentLegend } from "@/components/evidence";
-import { Badge, Button, Card, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Message } from "@brainchain/shared";
+import type { HomeData, Message } from "@brainchain/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { History, PanelRightOpen, Plus, Send, Sparkles } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -43,6 +43,12 @@ function AskPageInner() {
     queryFn: () =>
       api<{ items: { id: string; title: string; created_at: string }[] }>("/conversations"),
   });
+
+  const { data: home } = useQuery({
+    queryKey: ["home"],
+    queryFn: () => api<HomeData>("/home"),
+  });
+  const suggestedQuestions = (home?.suggested_questions ?? []).slice(0, 3);
 
   const askMutation = useMutation({
     mutationFn: (query: string) =>
@@ -185,21 +191,19 @@ function AskPageInner() {
                 Every claim is labeled — verified, inferred, conflicting or missing — and backed by
                 the evidence panel.
               </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                {[
-                  "What are the main risks affecting the Phoenix project this quarter?",
-                  "When is the Phoenix flight readiness review?",
-                  "Which contracts expire in the next 90 days?",
-                ].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => submit(q)}
-                    className="rounded-full border border-line px-3 py-1 text-[11.5px] text-ink-2 hover:border-accent hover:text-accent"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+              {suggestedQuestions.length > 0 && (
+                <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+                  {suggestedQuestions.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => submit(q)}
+                      className="rounded-full border border-line px-3 py-1 text-[11.5px] text-ink-2 hover:border-accent hover:text-accent"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
 
@@ -229,9 +233,16 @@ function AskPageInner() {
             </Card>
           )}
           {askMutation.isError && (
-            <Card className="border-crit/40 p-4 text-xs text-crit">
-              The assistant request failed: {(askMutation.error as Error).message}
-            </Card>
+            <ErrorState
+              message={
+                askMutation.error instanceof Error
+                  ? `The assistant request failed: ${askMutation.error.message}`
+                  : "The assistant request failed. The API may be down."
+              }
+              onRetry={
+                askMutation.variables ? () => askMutation.mutate(askMutation.variables!) : undefined
+              }
+            />
           )}
           <div ref={bottomRef} />
         </div>

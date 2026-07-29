@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "@/components/providers";
-import { Button, Skeleton, Textarea } from "@/components/ui";
+import { Button, EmptyState, ErrorState, Skeleton, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { FeedbackAggregate, HomeData, MeetingInfo, SurveyInfo, TaskInfo } from "@brainchain/shared";
@@ -34,7 +34,7 @@ export default function TodayPage() {
   const [question, setQuestion] = React.useState("");
   const isManager = hasRole(user, "manager", "executive", "security_admin");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["home"],
     queryFn: () => api<HomeData>("/home"),
   });
@@ -68,6 +68,20 @@ export default function TodayPage() {
   const openSurvey = surveys?.items[0];
   const recentMeeting = meetings?.items[0];
   const topSignal = isManager && signals?.cohort_met ? signals.themes.find((t) => !t.suppressed) : null;
+  const recentMeetings = [...(meetings?.items ?? [])]
+    .sort((a, b) => new Date(b.held_at ?? 0).getTime() - new Date(a.held_at ?? 0).getTime())
+    .slice(0, 3);
+
+  // ERROR-FIRST: the home dashboard is built entirely from `/home`, so a
+  // failed fetch must surface an error card rather than a permanent skeleton
+  // or a page rendered with undefined data.
+  if (isError) {
+    return (
+      <div className="mx-auto w-full max-w-[1060px]">
+        <ErrorState message="Couldn't load your home dashboard. The API may be down." onRetry={() => refetch()} />
+      </div>
+    );
+  }
 
   // Today's BLUF: the few one-liners that changed today, dot-coded by nature.
   const bluf: { dot: string; text: string; href: string }[] = [];
@@ -196,13 +210,25 @@ export default function TodayPage() {
             <HeaderLink href="/meetings">Full schedule</HeaderLink>
           </div>
           <div className="flex flex-col gap-2.5">
-            <UpcomingRow
-              time="10:00"
-              length="45 min"
-              title="Phoenix weekly program review"
-              people={recentMeeting ? `${recentMeeting.attendees.slice(0, 2).join(", ")} + ${Math.max(recentMeeting.attendees.length - 2, 0)}` : "Program team"}
-              href="/meetings"
-            />
+            {recentMeetings.length > 0 ? (
+              recentMeetings.map((meeting) => (
+                <UpcomingRow
+                  key={meeting.id}
+                  time={formatDate(meeting.held_at)}
+                  length={`${meeting.attendees.length} attendee${meeting.attendees.length === 1 ? "" : "s"}`}
+                  title={meeting.title}
+                  people={meeting.attendees.slice(0, 3).join(", ") || "No attendees recorded"}
+                  href={`/meetings/${meeting.id}/review`}
+                />
+              ))
+            ) : (
+              !isLoading && (
+                <EmptyState
+                  title="No meetings imported yet"
+                  body="Import a transcript from the Meetings page to see it here."
+                />
+              )
+            )}
             {(data?.deadlines ?? []).slice(0, 2).map((deadline) => (
               <UpcomingRow
                 key={deadline.document_id + deadline.date}
