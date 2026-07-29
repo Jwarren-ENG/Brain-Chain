@@ -44,3 +44,12 @@ resolved turns in review payload; redundant `transcript_doc` fetch in
 `resolve_artifact`; retry-409 guard can't distinguish zero-artifact success from
 never-ran; seeded July-10 meeting has turns-only extraction (tolerated, tested);
 fixture persona Priya Raman titled Thermal Engineer while doing structural work.
+
+## Redesign follow-ups (2026-07-29, post-merge fine)
+
+- Tighten tests: nav.test.tsx dead loop; copy.test.tsx add artifact/extraction display-string patterns.
+- Unify reviewer role set: landing pending-reviews card (manager|executive) vs Library decisions tab (+security_admin).
+- Wrap the three redirect stubs (/explorer,/company,/tribal) in Suspense (useSearchParams build constraint class).
+- Deduplicate ContributeMenu on the meetings page (header + invite panel both render one).
+- Accessibility pass: keyboard arrow-nav/Escape for Contribute and gear menus (role=menu without keys is an ARIA smell).
+- Landing recent-meetings card: add isError branch so a failed /meetings fetch doesn't render 'No meetings yet'.
