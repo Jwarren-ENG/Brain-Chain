@@ -1,6 +1,8 @@
 """Transcript import: roles, parsing errors, ACLs, audit, meeting creation."""
 import io
 
+from app.routers.meetings import MAX_TRANSCRIPT_CHARS
+
 VTT = (
     "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n"
     "Maria Santos: We decided to switch the bracket to 7075 aluminum.\n\n"
@@ -78,6 +80,49 @@ def test_importer_cannot_exceed_own_clearance(client, auth):
     restricted_id = _classification_at_level(client, headers, 3)
     resp = _import(client, headers, classification_id=restricted_id)
     assert resp.status_code == 403
+
+
+def test_oversized_multibyte_transcript_is_422_and_persists_nothing(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    before = client.get("/api/meetings", headers=headers).json()["items"]
+
+    # "本" is 3 bytes in UTF-8. A read cap of MAX_TRANSCRIPT_CHARS+1 *bytes*
+    # (the old, buggy behavior) can land exactly on a character boundary for
+    # some prefix lengths, in which case decoding the truncated bytes
+    # succeeds cleanly instead of raising UnicodeDecodeError — and the
+    # resulting (truncated) character count is far below the cap, so the
+    # size check never fires either. That's the real bug: a file that is
+    # genuinely oversized gets silently accepted (200) with content chopped
+    # mid-transcript. Construct the prefix so the legacy byte-only cap lands
+    # on exactly such a boundary, to prove the fix (reading a worst-case
+    # 4-bytes/char budget before deciding on size) actually rejects it,
+    # rather than merely happening to 422 for the wrong reason.
+    cjk = "本"
+    cjk_bytes = len(cjk.encode())
+    old_cap_bytes = MAX_TRANSCRIPT_CHARS + 1
+    prefix = "A: "
+    pad = (old_cap_bytes - len(prefix)) % cjk_bytes
+    prefix += "x" * pad
+    assert (old_cap_bytes - len(prefix)) % cjk_bytes == 0
+
+    overflow_chars = MAX_TRANSCRIPT_CHARS + 5000  # genuinely exceeds the char cap
+    huge = prefix + cjk * overflow_chars
+    resp = _import(client, headers, classification_id=cid,
+                   filename="huge.txt", body=huge)
+    assert resp.status_code == 422, resp.text
+    after = client.get("/api/meetings", headers=headers).json()["items"]
+    assert len(after) == len(before)
+
+
+def test_unknown_department_id_is_404_and_persists_nothing(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    before = client.get("/api/meetings", headers=headers).json()["items"]
+    resp = _import(client, headers, classification_id=cid, department_id="not-a-real-department")
+    assert resp.status_code == 404
+    after = client.get("/api/meetings", headers=headers).json()["items"]
+    assert len(after) == len(before)
 
 
 def test_import_records_audit_event(client, auth):

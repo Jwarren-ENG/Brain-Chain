@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DataSource, Meeting, SecurityClassification, User, utcnow
+from ..models import DataSource, Department, Meeting, SecurityClassification, User, utcnow
 from ..security import audit
 from ..security.auth import require_roles
 from ..serializers import meeting_dict
@@ -55,8 +55,16 @@ def import_meeting(
         # An importer cannot create material they could not themselves read.
         raise HTTPException(status.HTTP_403_FORBIDDEN,
                             "You cannot import at a classification above your clearance")
+    if department_id:
+        department = db.get(Department, department_id)
+        if not department or department.org_id != user.org_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Department not found")
 
-    raw = file.file.read(MAX_TRANSCRIPT_CHARS + 1)
+    # Read a worst-case byte budget (UTF-8 is up to 4 bytes/char) before
+    # decoding, so a multi-byte-heavy transcript (CJK, Cyrillic, ...) that is
+    # oversized in characters isn't silently truncated mid-sentence by a
+    # byte-count read cap and returned as a 200.
+    raw = file.file.read(MAX_TRANSCRIPT_CHARS * 4 + 1)
     try:
         content = raw.decode("utf-8")
     except UnicodeDecodeError:
