@@ -57,11 +57,58 @@ class LocalHashedEmbeddings:
         return vec
 
 
-_provider = LocalHashedEmbeddings()
+class VoyageEmbeddings:
+    """Voyage AI embeddings over HTTPS. `post` is injectable for tests."""
+
+    def __init__(self, api_key: str, model: str, post=None):
+        import httpx
+
+        self.api_key = api_key
+        self.model = model
+        self.name = f"voyage ({model})"
+        self._post = post or httpx.post
+
+    def embed(self, text: str) -> list[float]:
+        return self.embed_many([text])[0]
+
+    def embed_many(self, texts: list[str]) -> list[list[float]]:
+        out: list[list[float]] = []
+        for i in range(0, len(texts), 128):  # Voyage batch limit headroom
+            batch = texts[i : i + 128]
+            resp = self._post(
+                "https://api.voyageai.com/v1/embeddings",
+                json={"input": batch, "model": self.model},
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            rows = sorted(resp.json()["data"], key=lambda d: d["index"])
+            out.extend(d["embedding"] for d in rows)
+        return out
+
+
+_provider: EmbeddingProvider | None = None
 
 
 def get_embedding_provider() -> EmbeddingProvider:
+    """Settings-driven singleton. Local hashed provider is the keyless default;
+    switching providers requires re-embedding (python -m app.reembed)."""
+    global _provider
+    if _provider is None:
+        from ..config import get_settings
+
+        settings = get_settings()
+        if settings.embeddings_provider == "voyage" and settings.voyage_api_key:
+            _provider = VoyageEmbeddings(settings.voyage_api_key, settings.voyage_model)
+        else:
+            _provider = LocalHashedEmbeddings()
     return _provider
+
+
+def reset_embedding_provider() -> None:
+    """Test helper: force re-selection on next call."""
+    global _provider
+    _provider = None
 
 
 def cosine(a: list[float], b: list[float]) -> float:
