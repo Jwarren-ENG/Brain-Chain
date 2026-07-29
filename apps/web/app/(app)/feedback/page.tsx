@@ -16,6 +16,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import { cn, formatDate, hasRole } from "@/lib/utils";
 import type { FeedbackAggregate, SurveyInfo } from "@brainchain/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -205,7 +206,7 @@ function Composer() {
             <Link
               href={`/interviews/new?purpose=concern&mode=text`}
               className="inline-flex h-9.5 items-center gap-1.5 rounded-lg border border-dashed border-line-strong px-3.5 text-sm font-medium text-ink-2 hover:border-accent hover:text-accent"
-              title="Start a short interview — the brain asks follow-up questions so your concern arrives with full context"
+              title={`Start a short interview — ${ASSISTANT_NAME} asks follow-up questions so your concern arrives with full context`}
             >
               <Sparkles className="size-4" /> Help me explain this
             </Link>

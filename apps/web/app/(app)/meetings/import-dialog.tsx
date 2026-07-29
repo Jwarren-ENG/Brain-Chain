@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Dialog, Input, InfoNote, Select } from "@/components/ui";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import type { MeetingImportResponse } from "@brainchain/shared";
 import * as React from "react";
 
@@ -111,7 +112,7 @@ export function ImportTranscriptDialog({
         </div>
         <InfoNote tone="privacy">
           Zoom/Meet <code>.vtt</code> exports or &ldquo;Speaker: text&rdquo; <code>.txt</code> files.
-          Extracted knowledge stays <strong>proposed</strong> until a reviewer approves it.
+          What {ASSISTANT_NAME} captures stays <strong>proposed</strong> until a reviewer approves it.
         </InfoNote>
         {error && (
           <p role="alert" className="text-xs text-crit">

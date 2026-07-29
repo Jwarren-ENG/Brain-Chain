@@ -42,7 +42,7 @@ reset & preflight before every demo; the six beats below are the story.
 
 ## The 6 beats (spec §2)
 
-1. **IMPORT** — as **morgan.reyes**: Meetings → Import transcript →
+1. **IMPORT** — as **morgan.reyes**: Meetings → Contribute → Import a meeting →
    `apps/api/tests/fixtures/design_review.vtt` (title "Phoenix bracket design review",
    project Phoenix, classification Internal).
 2. **EXTRACT** — open the review queue (`/meetings/{id}/review`): proposed decisions with
@@ -51,7 +51,7 @@ reset & preflight before every demo; the six beats below are the story.
    artifacts are never silently kept.
 3. **APPROVE** — approve the bracket-material decision (edit the rationale live to show
    it's editable, not canned), reject one of the risks, leave the open question
-   unresolved. Show the published decision record in the knowledge explorer: what, why,
+   unresolved. Show the published decision record in the Library: what, why,
    who approved it, and its evidence link back to the meeting.
 4. **SLACK** — as **avery.chen**'s mapped Slack account: DM *"Why did we switch the
    bracket material to 7075?"* → a segmented answer citing the new decision record and

@@ -59,7 +59,7 @@ export function ContributeMenu({
               <MenuButton
                 icon={<Upload className="size-4" />}
                 title="Import a meeting"
-                blurb="Upload a transcript for extraction and review."
+                blurb={`Upload a transcript for ${ASSISTANT_NAME} to capture and review.`}
                 onClick={() => {
                   setOpen(false);
                   setImportOpen(true);

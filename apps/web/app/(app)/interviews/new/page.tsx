@@ -3,6 +3,7 @@
 import { PurposePicker, VisibilityPicker } from "@/components/interview/shared";
 import { Badge, Button, Card, InfoNote, Input, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import type {
   InterviewMode,
@@ -21,7 +22,7 @@ const MODES: { key: InterviewMode; label: string; blurb: string; icon: React.Rea
   {
     key: "voice",
     label: "Voice interview",
-    blurb: "Speak naturally; the brain asks follow-ups. Requires explicit consent before the microphone starts.",
+    blurb: `Speak naturally; ${ASSISTANT_NAME} asks follow-ups. Requires explicit consent before the microphone starts.`,
     icon: <Mic className="size-4" />,
   },
   {
@@ -96,14 +97,14 @@ function NewInterviewInner() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <Link href="/" className="inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink">
-          <ArrowLeft className="size-3.5" /> Today
+          <ArrowLeft className="size-3.5" /> Home
         </Link>
         <h1 className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-tight text-ink">
-          <Brain className="size-5 text-accent" /> Talk to the Brain
+          <Brain className="size-5 text-accent" /> Tell {ASSISTANT_NAME} something
         </h1>
         <p className="mt-1 text-sm text-ink-3">
-          Tell the company brain something it should understand. You control what is saved — every
-          extracted item is reviewed by you before it enters company memory.
+          Tell {ASSISTANT_NAME} something it should understand. You control what is saved — every
+          captured item is reviewed by you before it enters company memory.
         </p>
         {meeting && (
           <Badge tone="accent" className="mt-2">

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/components/providers";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import { formatDateTime, hasRole } from "@/lib/utils";
 import type {
   InterviewAssignmentInfo,
@@ -97,7 +98,7 @@ export default function InterviewsPage() {
             href="/interviews/new"
             className="inline-flex h-9.5 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-ink hover:opacity-90"
           >
-            <Plus className="size-4" /> Talk to the Brain
+            <Plus className="size-4" /> Tell {ASSISTANT_NAME} something
           </Link>
         </div>
       </header>
@@ -137,7 +138,7 @@ export default function InterviewsPage() {
           {!drafts.length && !done.length && !(assignments?.assigned_to_me.length ?? 0) && (
             <EmptyState
               icon={<Brain className="size-6" />}
-              title="Tell the company brain something it should understand"
+              title={`Tell ${ASSISTANT_NAME} something it should understand`}
               body="Explain a process, share a concern, prepare a meeting, just talk, or capture what only you know."
               action={
                 <Link href="/interviews/new" className="text-sm font-medium text-accent hover:underline">
@@ -317,7 +318,7 @@ function RequestDialog({ open, onClose }: { open: boolean; onClose: () => void }
     <Dialog open={open} onClose={onClose} title="Request an interview">
       <div className="space-y-3">
         <p className="text-xs leading-relaxed text-ink-3">
-          Ask a person or a team to talk to the brain about something. It's a request, not an
+          Ask a person or a team to tell {ASSISTANT_NAME} about something. It's a request, not an
           order: individuals can decline, team members can simply not respond, and you never see
           the conversation itself — only what they choose to publish
           {scope === "department" ? " and an aggregate response count" : ""}.

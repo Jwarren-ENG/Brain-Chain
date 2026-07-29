@@ -3,6 +3,7 @@
 import { useSession } from "@/components/providers";
 import { Card, CardSkeleton, ErrorState, InfoNote } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { MeetingReviewPayload, ResolveArtifactRequest } from "@brainchain/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -100,15 +101,15 @@ export default function MeetingReviewPage() {
 
       {!canReview && (
         <InfoNote>
-          You're viewing the evidence the brain extracted from this meeting. Approving or
-          rejecting proposed knowledge requires the manager or executive role.
+          You're viewing what {ASSISTANT_NAME} captured from this meeting. Approving or rejecting
+          proposed knowledge requires the manager or executive role.
         </InfoNote>
       )}
 
       {extractionError && !hasArtifacts && (
         <Card className="space-y-3 p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-crit">
-            <ShieldAlert className="size-4" /> Extraction failed
+            <ShieldAlert className="size-4" /> Couldn't process this meeting
           </p>
           <p className="text-xs leading-relaxed text-ink-3">{extractionError}</p>
           {canRetryExtraction && (
@@ -118,7 +119,7 @@ export default function MeetingReviewPage() {
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-btn px-4 text-[13px] font-semibold text-btn-ink hover:opacity-90 disabled:opacity-50"
             >
               <RefreshCw className="size-3.5" />
-              {retryExtraction.isPending ? "Retrying…" : "Retry extraction"}
+              {retryExtraction.isPending ? "Retrying…" : "Retry"}
             </button>
           )}
           {retryExtraction.isError && (
@@ -198,8 +199,9 @@ export default function MeetingReviewPage() {
 
       {!hasArtifacts && !extractionError && (
         <Card className="p-6 text-center text-sm text-ink-2">
-          The brain didn't extract any structured knowledge from this transcript — only the raw
-          turns were stored. There's nothing to review yet.
+          {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} didn't capture any structured
+          knowledge from this transcript — only the raw turns were stored. There's nothing to
+          review yet.
         </Card>
       )}
 

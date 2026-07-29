@@ -17,6 +17,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import type {
   InterviewArtifactInfo,
   InterviewSessionInfo,
@@ -128,7 +129,7 @@ export default function InterviewWorkspacePage() {
         </Link>
         <span className="text-ink-3">/</span>
         <h1 className="text-sm font-semibold text-ink">
-          {session.title || "Brain Interview"}
+          {session.title || `Tell ${ASSISTANT_NAME}`}
         </h1>
         <div className="ml-auto flex items-center gap-1.5">
           <Badge tone="neutral">{session.purpose.replace(/_/g, " ")}</Badge>
@@ -443,7 +444,10 @@ function TextWorkspace({
         </Button>
         <DeleteButton sessionId={session.id} receipt={receipt} label="Discard" />
         {envelope?.can_complete && (
-          <span className="text-[11px] text-good">The brain has enough to work with whenever you're ready.</span>
+          <span className="text-[11px] text-good">
+            {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} has enough to work with
+            whenever you're ready.
+          </span>
         )}
       </div>
     </div>
@@ -657,14 +661,14 @@ function ReviewWorkspace({
   return (
     <div className="space-y-4">
       <InfoNote tone="privacy">
-        <strong>Nothing has been saved to company memory yet.</strong> Review what the brain
+        <strong>Nothing has been saved to company memory yet.</strong> Review what {ASSISTANT_NAME}{" "}
         understood, correct or exclude anything, then publish only what you approve.
       </InfoNote>
 
       {!artifacts.length && (
         <Card className="p-6 text-center text-sm text-ink-2">
-          The brain didn't extract anything substantial from this conversation. You can discard the
-          session, or delete it entirely.
+          {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} didn't find anything
+          substantial in this conversation. You can discard the session, or delete it entirely.
         </Card>
       )}
 
