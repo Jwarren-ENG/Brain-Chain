@@ -146,10 +146,19 @@ def _ingest_item(db: Session, connector: Connector, item: dict, log: list[dict])
 
     if item.get("kind") == "transcript":
         from .meeting_extraction import ExtractionError, extract_meeting, persist_extraction
-        from .transcripts import parse_transcript_file, turns_to_meta
+        from .transcripts import TranscriptParseError, parse_transcript_file, turns_to_meta
 
-        turns = parse_transcript_file(item.get("title", "t.txt") + ".txt",
-                                      item.get("content", ""))
+        try:
+            turns = parse_transcript_file(item.get("title", "t.txt") + ".txt",
+                                          item.get("content", ""))
+        except TranscriptParseError as exc:
+            # The document itself is already ingested above; just skip
+            # meeting/artifact creation for this one item and keep the batch
+            # going — one unparseable transcript must not fail the whole sync.
+            log.append({"t": utcnow().isoformat(),
+                        "msg": f"Transcript parse failed: {exc}", "level": "error"})
+            return
+
         meeting = Meeting(
             org_id=connector.org_id,
             title=item.get("title", "Meeting"),
