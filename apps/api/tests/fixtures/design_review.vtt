@@ -1,0 +1,165 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:12.000
+Morgan Reyes: Thanks everyone for joining on short notice. Today's focus is the avionics mounting bracket — we need to close out the material decision before the qualification campaign restarts.
+
+2
+00:00:13.000 --> 00:00:22.000
+Leo Martins: Right. Quick recap: the 6061-T6 bracket cracked at the mounting ear during the last vibration run, well below its rated margin.
+
+3
+00:00:23.000 --> 00:00:31.000
+Avery Chen: That's the bracket holding the flight computer chassis, correct? If it lets go under vibe, we lose the whole avionics stack.
+
+4
+00:00:32.000 --> 00:00:38.000
+Leo Martins: Correct. We pulled the failed part and the fracture surface shows fatigue, not a one-off defect.
+
+5
+00:00:39.000 --> 00:00:51.000
+Priya Raman: I ran the numbers again last night. Margin on 6061-T6 at the mounting ear is actually negative once you include the vibration test's real environment, not just the design spec.
+
+6
+00:00:52.000 --> 00:00:56.000
+Morgan Reyes: How negative are we talking?
+
+7
+00:00:57.000 --> 00:01:03.000
+Priya Raman: About twelve percent under. That's a real structural risk, not a measurement artifact.
+
+8
+00:01:04.000 --> 00:01:14.000
+Leo Martins: We looked at three options. Option one: thicken the 6061 ear geometry. Option two: switch to 7075-T6. Option three: go to a titanium bracket.
+
+9
+00:01:15.000 --> 00:01:19.000
+Avery Chen: What ruled out thickening the existing part?
+
+10
+00:01:20.000 --> 00:01:33.000
+Leo Martins: It clears the margin, but adds forty grams right at the flight computer interface, and we'd need to re-qualify the connector clearance. That's schedule risk we can't absorb before FRR.
+
+11
+00:01:34.000 --> 00:01:45.000
+Priya Raman: Titanium clears the margin easily and then some, but Leo's shop quoted six weeks just for the new fixture, and the material cost is nearly four times 7075.
+
+12
+00:01:46.000 --> 00:01:50.000
+Morgan Reyes: So titanium is out on cost and schedule.
+
+13
+00:01:51.000 --> 00:01:57.000
+Leo Martins: It's out for this build. Worth keeping on the table for Skylark if we ever need the extra margin.
+
+14
+00:01:58.000 --> 00:02:02.000
+Avery Chen: And 7075?
+
+15
+00:02:03.000 --> 00:02:17.000
+Priya Raman: 7075-T6 gives us about eighteen percent margin over the qualification environment, the weight increase over 6061 is negligible, and it's a drop-in geometry — no re-qualification of the connector interface.
+
+16
+00:02:18.000 --> 00:02:26.000
+Leo Martins: Machinability is worse than 6061, but our shop has already cut 7075 on the Skylark bracket, so it's not a new process for us.
+
+17
+00:02:27.000 --> 00:02:31.000
+Morgan Reyes: Any concerns with corrosion or fastener compatibility?
+
+18
+00:02:32.000 --> 00:02:41.000
+Leo Martins: 7075 needs the same anodize and isolation washers we already spec for dissimilar-metal contact, so there's no new failure mode there.
+
+19
+00:02:42.000 --> 00:02:47.000
+Avery Chen: I'm satisfied on the interface side. No changes needed to the harness routing.
+
+20
+00:02:48.000 --> 00:02:59.000
+Morgan Reyes: Then let's lock in 7075-T6 for the avionics mounting bracket. We've decided to switch the bracket material from 6061-T6 to 7075-T6 for the qualification build.
+
+21
+00:03:00.000 --> 00:03:14.000
+Priya Raman: I'll note the rationale for the record: 6061 shows negative margin under the real vibration environment, and 7075-T6 clears it with margin to spare without redesigning the interface, which both the thickened-6061 option and the titanium option would have required.
+
+22
+00:03:15.000 --> 00:03:20.000
+Leo Martins: I will update the stress analysis report with the 7075 numbers by August 7.
+
+23
+00:03:21.000 --> 00:03:25.000
+Morgan Reyes: Good. Dana, where are we on raw stock?
+
+24
+00:03:26.000 --> 00:03:38.000
+Dana Wolfe: Orbital Metals can turn around 7075 plate in two weeks, well inside the window. I'm worried about the anodize vendor, though — they're already backed up from the Skylark run.
+
+25
+00:03:39.000 --> 00:03:43.000
+Morgan Reyes: Is that a hard blocker?
+
+26
+00:03:44.000 --> 00:03:52.000
+Dana Wolfe: Not yet, but it's a real risk if they don't give us a slot by mid-August. I'll follow up with them by Wednesday.
+
+27
+00:03:53.000 --> 00:04:03.000
+Priya Raman: Separately, while I have procurement here — has Nimbus recovered on the composite panel side? That was flagged as a supplier risk last month.
+
+28
+00:04:04.000 --> 00:04:14.000
+Dana Wolfe: Yes, actually — Nimbus has been running at ninety-five percent on-time for the last two shipments, so I don't think that's a live risk anymore.
+
+29
+00:04:15.000 --> 00:04:21.000
+Morgan Reyes: Good to hear. Let's make sure that's reflected wherever we're tracking supplier risk.
+
+30
+00:04:22.000 --> 00:04:28.000
+Avery Chen: Back to the bracket — do we have a coupon test planned before we cut the full qualification part?
+
+31
+00:04:29.000 --> 00:04:34.000
+Leo Martins: Yes, three coupons are machined this week, mechanical test early next week.
+
+32
+00:04:35.000 --> 00:04:43.000
+Priya Raman: If the coupons don't hit predicted strength, that's a schedule risk — we'd be into September before we could requalify.
+
+33
+00:04:44.000 --> 00:04:48.000
+Morgan Reyes: Understood. We'll treat the coupon results as the go/no-go gate.
+
+34
+00:04:49.000 --> 00:04:58.000
+Avery Chen: One open item — do we have qualified 7075-T6 stock on hand right now, or are we fully dependent on the new Orbital Metals order?
+
+35
+00:04:59.000 --> 00:05:08.000
+Dana Wolfe: We have enough certified stock for the coupons and one flight-like part. Not enough for a second attempt if something goes wrong.
+
+36
+00:05:09.000 --> 00:05:14.000
+Morgan Reyes: Let's flag that as an open question for next week rather than guess at it today.
+
+37
+00:05:15.000 --> 00:05:21.000
+Leo Martins: Agreed. I'll have a real answer once I check the cert paperwork on the stock we already have.
+
+38
+00:05:22.000 --> 00:05:28.000
+Priya Raman: Last thing on my list — fastener pattern is unchanged for the new geometry, so no new risk there.
+
+39
+00:05:29.000 --> 00:05:43.000
+Morgan Reyes: Alright, to summarize: decision made on bracket material, Leo's got the stress report due August 7, Dana's chasing anodize capacity, and we're leaving the stock quantity question open until next week.
+
+40
+00:05:44.000 --> 00:05:50.000
+Avery Chen: Works for me — I'll have the connector clearance sign-off ready whenever Leo's coupons come back.
+
+41
+00:05:51.000 --> 00:05:56.000
+Morgan Reyes: Thanks everyone. Let's meet again next week once we have the coupon results.

@@ -1,0 +1,20 @@
+Dana Wolfe: Thanks for hopping on, appreciate you making time this week.
+Marcus Webb: Of course — you wanted to talk about the 7075 plate order and the anodize backlog?
+Dana Wolfe: Right, two things. First, confirm you can still hit the two-week turnaround on the 7075-T6 plate stock.
+Marcus Webb: Yes, that's holding. We pulled it forward in the queue once we saw the priority flag from Helios.
+Dana Wolfe: Good — we're worried about a schedule slip if that moves at all, this feeds a flight qualification build.
+Marcus Webb: Understood, it's flagged as priority through delivery on our end.
+Dana Wolfe: Second item — Titan Anodizing mentioned they're backed up from our own Skylark run. Any visibility on their queue from your side?
+Marcus Webb: We don't manage their queue directly, but we can put in a word. We've decided to route future orders through their east coast facility going forward, which has more open capacity.
+Dana Wolfe: That would help. Is there a cost delta on that facility?
+Marcus Webb: Roughly three percent higher per lot, but well within your existing PO terms.
+Dana Wolfe: Acceptable given the schedule risk otherwise. Let's lock in the east coast routing for this order and the rest of the Phoenix lots.
+Marcus Webb: I will send the updated routing confirmation by Friday.
+Dana Wolfe: One more thing — any quality concerns on the last two 7075 lots?
+Marcus Webb: No rejects on our end. Cert paperwork came back clean both times.
+Dana Wolfe: Good to hear. Any risk of a price increase this quarter on 7075 stock generally?
+Marcus Webb: Aluminum spot pricing has been stable, but there's some risk if tariffs move — we'd pass that through with thirty days notice.
+Dana Wolfe: Understood, we'll track that as a watch item, not an active risk yet.
+Marcus Webb: Agreed. Anything else you need from us this week?
+Dana Wolfe: No, that covers it. I'll follow up once we've confirmed the routing change internally.
+Marcus Webb: Sounds good, talk soon.

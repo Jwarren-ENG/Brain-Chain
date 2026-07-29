@@ -125,7 +125,7 @@ From **Today → Talk to the Brain** (full spec: [docs/brain-interviews.md](docs
    welcome; you see only an aggregate response count, never who). The request
    appears on the employee's Today; the requester never sees the conversation.
 
-`apps/api/tests/test_interview_*.py` (28 tests) prove the state machine, structural
+`apps/api/tests/test_interview_*.py` (34 tests) prove the state machine, structural
 anonymity, consent enforcement, citation requirements, publishing routes, and deletion
 propagation.
 
@@ -154,7 +154,24 @@ All backend settings are environment variables prefixed `BRAINCHAIN_` — see
 | `BRAINCHAIN_MIN_FEEDBACK_COHORT` | `5` | Anonymity floor (org setting can raise it) |
 | `BRAINCHAIN_OPENAI_BASE_URL/_API_KEY/_MODEL` | unset | Optional OpenAI-compatible provider (env-only, never committed) |
 | `BRAINCHAIN_LOG_RAW_PROMPTS` | `false` | Audit stores metadata only unless policy allows |
+| `BRAINCHAIN_ANTHROPIC_API_KEY` | unset | Enables the real Claude answer + meeting-extraction providers; unset keeps the keyless mock |
+| `BRAINCHAIN_ANTHROPIC_MODEL` | `claude-sonnet-5` | Anthropic model id used by both providers |
+| `BRAINCHAIN_EMBEDDINGS_PROVIDER` | `local` | `local` (hashed, keyless) or `voyage` (real embeddings, needs a key) |
+| `BRAINCHAIN_VOYAGE_API_KEY` | unset | Required when `BRAINCHAIN_EMBEDDINGS_PROVIDER=voyage` |
+| `BRAINCHAIN_VOYAGE_MODEL` | `voyage-3.5` | Voyage embeddings model id |
+| `BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS` | `false` | Must be `true` (plus the org's `external_models_enabled` setting) before any external model or embeddings call is made |
+| `BRAINCHAIN_SLACK_SERVICE_TOKEN` | unset | Shared secret the API checks (constant-time) against the Slack app's `BRAINCHAIN_SERVICE_TOKEN`; 401 if unset |
 | `NEXT_PUBLIC_API_URL` (web) | `http://localhost:8000/api` | API base for the frontend |
+
+External model/embedding calls additionally require the org setting `external_models_enabled=true`
+(Administration → org settings) even when the env vars above are set — both gates must pass.
+
+**Slack surface:** apps/slack (Socket Mode) needs `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, and
+`BRAINCHAIN_SERVICE_TOKEN` (must match `BRAINCHAIN_SLACK_SERVICE_TOKEN` above), plus optional
+`BRAINCHAIN_API_URL` / `BRAINCHAIN_WEB_URL` overrides — see
+[apps/slack/README.md](apps/slack/README.md) for setup. For the full walkthrough (reset,
+preflight, the 6 demo beats, failure modes) see
+[docs/runbooks/demo-script.md](docs/runbooks/demo-script.md).
 
 ## Docker Compose (full profile)
 
@@ -171,18 +188,36 @@ app. See [docs/deployment.md](docs/deployment.md) for the three deployment profi
 ```bash
 # Backend
 cd apps/api
-../../.venv/bin/python -m pytest          # 30 tests: permissions, anonymity, approvals, auth
+../../.venv/bin/python -m pytest          # 126 tests: permissions, anonymity, approvals, auth,
+                                           # meeting import/extraction/review, providers, connectors
+                                           # (124 pass, 2 skip — live-model goldens, opt-in below)
 ../../.venv/bin/python -m ruff check .    # lint
 BRAINCHAIN_DATABASE_URL=sqlite:////tmp/scratch.db ../../.venv/bin/python -m alembic upgrade head
+
+# Slack app
+cd ../slack
+../../.venv/bin/python -m pytest tests/   # 13 tests: permission parity, error handling, blocks
 
 # Frontend
 pnpm --filter @brainchain/web typecheck
 pnpm --filter @brainchain/web lint
-pnpm --filter @brainchain/web test        # vitest component/unit tests
+pnpm --filter @brainchain/web test        # 19 vitest component/unit tests
 pnpm --filter @brainchain/web build       # production build
 ```
 
 All of the above pass in this repository.
+
+### Golden extraction tests (live model, opt-in)
+
+`apps/api/tests/test_live_extraction.py` never runs in the default suite — it's skipped
+keyless (see above). Run it against the real Anthropic extraction provider before every demo:
+
+```bash
+cd apps/api
+RUN_LIVE_MODEL_TESTS=1 ../../.venv/bin/python -m pytest tests/test_live_extraction.py -v
+```
+
+See [docs/runbooks/demo-script.md](docs/runbooks/demo-script.md) for the full preflight.
 
 ## Documentation
 
