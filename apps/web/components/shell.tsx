@@ -3,7 +3,7 @@
 import { api, setStoredUser, setToken } from "@/lib/api";
 import { cn, hasRole } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { FileSearch, LogOut, Moon, Search, Sparkles, Sun } from "lucide-react";
+import { FileSearch, LogOut, Moon, Search, Settings, Sparkles, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
@@ -17,42 +17,22 @@ interface NavItem {
   badgeKey?: "work";
 }
 
-const NAV: { section: string; items: NavItem[] }[] = [
-  {
-    section: "Your workspace",
-    items: [
-      { href: "/", label: "Today" },
-      { href: "/ask", label: "New chat" },
-      { href: "/feedback", label: "Share feedback" },
-      { href: "/meetings", label: "Meetings" },
-      { href: "/interviews", label: "Interviews" },
-      { href: "/approvals", label: "My work", badgeKey: "work" },
-    ],
-  },
-  {
-    section: "Company memory",
-    items: [
-      { href: "/explorer", label: "Browse knowledge" },
-      { href: "/company", label: "Company context" },
-    ],
-  },
-  {
-    section: "Manage",
-    items: [
-      { href: "/insights", label: "Team signals", roles: ["manager", "executive", "security_admin"] },
-      { href: "/tribal", label: "Decision memory", roles: ["manager", "executive", "security_admin"] },
-    ],
-  },
-  {
-    section: "Platform",
-    items: [
-      { href: "/integrations", label: "Connected sources", roles: ["data_steward", "system_admin", "security_admin"] },
-      { href: "/governance", label: "Data governance", roles: ["data_steward", "system_admin", "security_admin"] },
-      { href: "/policies", label: "Model policies", roles: ["security_admin", "system_admin"] },
-      { href: "/audit", label: "Audit log", roles: ["security_admin", "system_admin"] },
-      { href: "/admin", label: "Administration", roles: ["system_admin", "security_admin"] },
-    ],
-  },
+/** The collapsed sidebar: exactly Home, Meetings, My work. No sections, no role gating. */
+export const NAV_ITEMS: NavItem[] = [
+  { href: "/", label: "Home" },
+  { href: "/meetings", label: "Meetings" },
+  { href: "/approvals", label: "My work", badgeKey: "work" },
+];
+
+/** Admin/manage surfaces, relocated out of the sidebar into the gear menu. Role arrays copied verbatim from the prior NAV. */
+export const GEAR_ITEMS: NavItem[] = [
+  { href: "/insights", label: "Team signals", roles: ["manager", "executive", "security_admin"] },
+  { href: "/integrations", label: "Connected sources", roles: ["data_steward", "system_admin", "security_admin"] },
+  { href: "/governance", label: "Data governance", roles: ["data_steward", "system_admin", "security_admin"] },
+  { href: "/policies", label: "Model policies", roles: ["security_admin", "system_admin"] },
+  { href: "/audit", label: "Audit log", roles: ["security_admin", "system_admin"] },
+  { href: "/admin", label: "Administration", roles: ["system_admin", "security_admin"] },
+  { href: "/brain-map", label: "Brain map", roles: ["manager", "executive", "security_admin"] },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -61,6 +41,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = React.useState(false);
+  const [gearOpen, setGearOpen] = React.useState(false);
 
   const { data: workCount } = useQuery({
     queryKey: ["nav-work-count"],
@@ -100,6 +81,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   const badges: Record<string, number | undefined> = { work: workCount };
+  const gearItems = GEAR_ITEMS.filter((item) => !item.roles || hasRole(user, ...item.roles));
 
   return (
     <div className="flex min-h-screen">
@@ -111,53 +93,42 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">BrainChain</span>
         </div>
         <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Main">
-          {NAV.map((group) => {
-            const items = group.items.filter((item) => !item.roles || hasRole(user, ...item.roles));
-            if (!items.length) return null;
-            return (
-              <div key={group.section} className="mb-4">
-                <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3/80">
-                  {group.section}
-                </p>
-                <ul className="space-y-0.5">
-                  {items.map((item) => {
-                    const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                    const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          aria-current={active ? "page" : undefined}
-                          className={cn(
-                            "flex items-center justify-between gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] transition-colors",
-                            active
-                              ? "bg-panel-2 font-semibold text-ink"
-                              : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
-                          )}
-                        >
-                          <span className="flex min-w-0 items-center gap-2.5">
-                            <span
-                              className={cn(
-                                "size-[5px] shrink-0 rounded-full",
-                                active ? "bg-accent" : "bg-transparent",
-                              )}
-                              aria-hidden
-                            />
-                            <span className="truncate">{item.label}</span>
-                          </span>
-                          {badge !== undefined && badge > 0 && (
-                            <span className="rounded-[5px] bg-panel-2 px-1.5 py-px font-mono text-[10.5px] text-ink-3">
-                              {badge}
-                            </span>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex items-center justify-between gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] transition-colors",
+                      active
+                        ? "bg-panel-2 font-semibold text-ink"
+                        : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={cn(
+                          "size-[5px] shrink-0 rounded-full",
+                          active ? "bg-accent" : "bg-transparent",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {badge !== undefined && badge > 0 && (
+                      <span className="rounded-[5px] bg-panel-2 px-1.5 py-px font-mono text-[10.5px] text-ink-3">
+                        {badge}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </nav>
         <div className="flex items-center gap-2.5 border-t border-line px-2.5 pt-3.5">
           <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-panel-2 text-[11.5px] font-semibold text-ink-2">
@@ -197,6 +168,46 @@ export function Shell({ children }: { children: React.ReactNode }) {
           >
             {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
           </button>
+          {gearItems.length > 0 && (
+            <div className="relative inline-block">
+              <button
+                onClick={() => setGearOpen((v) => !v)}
+                aria-label="Settings"
+                aria-haspopup="menu"
+                aria-expanded={gearOpen}
+                className="rounded-[7px] border border-line p-1.5 text-ink-3 hover:border-line-strong hover:text-ink"
+              >
+                <Settings className="size-3.5" />
+              </button>
+              {gearOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    className="fixed inset-0 z-10 cursor-default"
+                    onClick={() => setGearOpen(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
+                  >
+                    {gearItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        role="menuitem"
+                        onClick={() => setGearOpen(false)}
+                        className="block truncate rounded-lg px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </header>
         <main className="flex-1 px-5 pb-16 pt-4 md:px-10">{children}</main>
       </div>
