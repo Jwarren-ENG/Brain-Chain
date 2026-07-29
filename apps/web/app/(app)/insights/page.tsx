@@ -175,13 +175,9 @@ export default function InsightsPage() {
                 {formatDateTime(brief.created_at)}
               </span>
               {brief.created_by_agent_run_id && (
-                <Link
-                  href={`/agents/runs/${brief.created_by_agent_run_id}`}
-                  className="inline-flex items-center text-[11px] font-medium text-accent hover:underline"
-                >
+                <span className="inline-flex items-center text-[11px] font-medium text-ink-2">
                   <Sparkles className="mr-0.5 size-3" /> by Executive Briefing Agent
-                  <ChevronRight className="size-3" />
-                </Link>
+                </span>
               )}
             </div>
             {brief.sections.map((section, i) => (

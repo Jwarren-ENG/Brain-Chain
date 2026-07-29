@@ -211,9 +211,7 @@ export default function BrainMapPage() {
                 ? "/integrations"
                 : c.key === "understand"
                   ? "/explorer"
-                  : c.key === "execute"
-                    ? "/agents"
-                    : "/insights",
+                  : "/insights",
         }),
       ),
     ];

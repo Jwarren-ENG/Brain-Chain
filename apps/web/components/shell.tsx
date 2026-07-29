@@ -41,7 +41,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { href: "/insights", label: "Team signals", roles: ["manager", "executive", "security_admin"] },
       { href: "/tribal", label: "Decision memory", roles: ["manager", "executive", "security_admin"] },
-      { href: "/agents", label: "Plans & agents", roles: ["manager", "executive", "agent_approver", "security_admin"] },
     ],
   },
   {
