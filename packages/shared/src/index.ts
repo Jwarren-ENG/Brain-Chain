@@ -364,8 +364,26 @@ export type ReviewArtifact =
   | ({ kind: "risk" } & ReviewRiskArtifact)
   | ({ kind: "question" } & ReviewQuestionArtifact);
 
+/** The raw `meeting.extraction` blob as written by `persist_extraction` /
+ * `import_meeting` (apps/api/app/services/meeting_extraction.py,
+ * app/routers/meetings.py) — NOT the same shape as `MeetingInfo["extraction"]`
+ * (that one is the list-view summary of `{text,speaker}` pairs). The review
+ * endpoint's `meeting_dict()` returns this raw blob verbatim under `meeting.
+ * extraction`, so `MeetingReviewPayload` types it separately rather than
+ * reusing `MeetingInfo` as-is. */
+export interface MeetingReviewMeta {
+  turns?: { idx: number; speaker: string; text: string; start?: string | null }[];
+  decisions?: { id: string; turn_ids: number[] }[];
+  actions?: { task_id: string; turn_ids: number[]; owner_name: string; due_hint: string }[];
+  risks?: { rid: string; text: string; severity: string; status: string; turn_ids: number[] }[];
+  questions?: { qid: string; text: string; raised_by: string; status: string; turn_ids: number[] }[];
+  dropped?: string[];
+  summary?: string;
+  error?: string;
+}
+
 export interface MeetingReviewPayload {
-  meeting: MeetingInfo;
+  meeting: Omit<MeetingInfo, "extraction"> & { extraction: MeetingReviewMeta | null };
   summary: string;
   decisions: ReviewDecisionArtifact[];
   actions: ReviewActionArtifact[];

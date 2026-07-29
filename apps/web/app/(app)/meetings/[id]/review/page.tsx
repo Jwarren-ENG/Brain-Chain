@@ -72,7 +72,7 @@ export default function MeetingReviewPage() {
     payload.actions.length > 0 ||
     payload.risks.length > 0 ||
     payload.questions.length > 0;
-  const extractionError = (meeting.extraction as { error?: string } | null)?.error;
+  const extractionError = meeting.extraction?.error;
 
   function resolveArtifact(
     kind: ResolveArtifactRequest["kind"],
