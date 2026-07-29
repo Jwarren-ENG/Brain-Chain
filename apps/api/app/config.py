@@ -31,6 +31,18 @@ class Settings(BaseSettings):
     openai_api_key: str = ""  # never committed; env only
     openai_model: str = ""
 
+    # Anthropic (preferred external answer/extraction provider). Env only.
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5"
+
+    # Embeddings: local (hashed, keyless) | voyage
+    embeddings_provider: str = "local"
+    voyage_api_key: str = ""
+    voyage_model: str = "voyage-3.5"
+
+    # Shared secret authenticating the Slack app to /ask/on-behalf-of.
+    slack_service_token: str = ""
+
     # Deployment profile: government | commercial | private
     deployment_profile: str = "commercial"
     # Government profile forces this to False regardless of the env value.
