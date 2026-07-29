@@ -73,3 +73,33 @@ export async function api<T>(
   }
   return resp.json() as Promise<T>;
 }
+
+/** Multipart upload helper. Deliberately omits Content-Type so the browser can
+ * set the multipart boundary itself; only the auth header is added. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const token = getToken();
+  const resp = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  if (resp.status === 401) {
+    setToken(null);
+    setStoredUser(null);
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+    throw new ApiError(401, "Session expired");
+  }
+  if (!resp.ok) {
+    let detail = resp.statusText;
+    try {
+      const data = await resp.json();
+      detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+    } catch {
+      /* keep statusText */
+    }
+    throw new ApiError(resp.status, detail);
+  }
+  return resp.json() as Promise<T>;
+}

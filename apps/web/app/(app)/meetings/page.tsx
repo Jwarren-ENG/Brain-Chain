@@ -1,10 +1,11 @@
 "use client";
 
+import { useSession } from "@/components/providers";
 import { Badge, Button, Card, CardSkeleton, Dialog, EmptyState, Tabs } from "@/components/ui";
-import { api } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
-import type { MeetingInfo, MeetingTopicInfo } from "@brainchain/shared";
-import { useQuery } from "@tanstack/react-query";
+import { api, apiUpload } from "@/lib/api";
+import { formatDate, hasRole } from "@/lib/utils";
+import type { Classification, MeetingImportResponse, MeetingInfo, MeetingTopicInfo } from "@brainchain/shared";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Brain,
@@ -18,23 +19,43 @@ import {
   MessageCircleMore,
   Mic2,
   Sparkles,
+  Upload,
   TriangleAlert,
   Users,
   Video,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
+import { ImportTranscriptDialog } from "./import-dialog";
 
 export default function MeetingsPage() {
+  const { user } = useSession();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [tab, setTab] = React.useState("prepare");
   const [openMeeting, setOpenMeeting] = React.useState<MeetingInfo | null>(null);
   const [contributeOpen, setContributeOpen] = React.useState(false);
   const [reflectionOpen, setReflectionOpen] = React.useState<MeetingInfo | null>(null);
+  const [importOpen, setImportOpen] = React.useState(false);
+
+  const canImport = hasRole(user, "manager", "data_steward", "system_admin");
 
   const { data, isLoading } = useQuery({
     queryKey: ["meetings"],
     queryFn: () => api<{ items: MeetingInfo[] }>("/meetings"),
   });
+
+  const { data: classifications } = useQuery({
+    queryKey: ["gov-classifications"],
+    queryFn: () => api<{ items: Classification[] }>("/governance/classifications"),
+    enabled: canImport,
+  });
+
+  function handleImported(result: MeetingImportResponse) {
+    queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    router.push(`/meetings/${result.meeting.id}/review`);
+  }
 
   const latest = data?.items[0];
   const { data: topics } = useQuery({
@@ -53,14 +74,21 @@ export default function MeetingsPage() {
           </h1>
           <p className="mt-1 text-sm text-ink-3">Better input before the room. Clear decisions and honest feedback after.</p>
         </div>
-        <Tabs
-          tabs={[
-            { key: "prepare", label: "Prepare" },
-            { key: "recaps", label: "Recaps & decisions" },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {canImport && (
+            <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="size-3.5" /> Import transcript
+            </Button>
+          )}
+          <Tabs
+            tabs={[
+              { key: "prepare", label: "Prepare" },
+              { key: "recaps", label: "Recaps & decisions" },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+        </div>
       </header>
 
       {tab === "prepare" ? (
@@ -254,6 +282,16 @@ export default function MeetingsPage() {
       <Dialog open={!!openMeeting} onClose={() => setOpenMeeting(null)} title={openMeeting?.title ?? "Meeting recap"} wide>
         {openMeeting && <MeetingRecap meeting={openMeeting} />}
       </Dialog>
+
+      {canImport && (
+        <ImportTranscriptDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          classifications={classifications?.items ?? []}
+          onImported={handleImported}
+          importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+        />
+      )}
     </div>
   );
 }

@@ -307,6 +307,14 @@ export interface MeetingInfo {
   transcript_document_id: string | null;
 }
 
+export interface MeetingImportResponse {
+  meeting: MeetingInfo;
+  document_id: string;
+  turn_count: number;
+  extraction_status: string;
+  counts?: { decisions: number; actions: number; risks: number; questions: number };
+}
+
 export interface DecisionInfo {
   id: string;
   title: string;
