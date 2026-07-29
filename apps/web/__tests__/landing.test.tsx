@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-import { AskBox } from "../app/(app)/page";
+import { AskBox } from "../app/(app)/ask-box";
 
 describe("landing AskBox", () => {
   it("routes the question to /ask?q=…", () => {

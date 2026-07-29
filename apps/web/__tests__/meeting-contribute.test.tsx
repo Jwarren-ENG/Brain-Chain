@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MeetingCard } from "../app/(app)/meetings/page";
+import { MeetingCard } from "../app/(app)/meetings/meeting-card";
 import type { MeetingInfo } from "@brainchain/shared";
 
 const meeting: MeetingInfo = {
