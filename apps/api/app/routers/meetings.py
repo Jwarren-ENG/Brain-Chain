@@ -347,7 +347,13 @@ def resolve_artifact(
         if "title" in body.edits:
             row.title = str(body.edits["title"])[:400]
         row.status = "open" if approve else "cancelled"
-        result = {"task_id": row.id, "title": row.title, "status": row.status}
+        action_ref = next((a for a in (meeting.extraction or {}).get("actions", [])
+                           if a.get("task_id") == row.id), {})
+        result = {"task_id": row.id, "title": row.title,
+                  "owner_name": action_ref.get("owner_name", ""),
+                  "due_hint": action_ref.get("due_hint", ""),
+                  "status": row.status,
+                  "turns": _resolve_turns(action_ref.get("turn_ids", []), turns_map)}
     else:  # risk | question — stored in meeting.extraction JSON
         key = "risks" if body.kind == "risk" else "questions"
         id_field = "rid" if body.kind == "risk" else "qid"

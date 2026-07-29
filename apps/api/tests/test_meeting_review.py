@@ -9,7 +9,9 @@ VTT = (
     "2\n00:00:04.500 --> 00:00:08.000\n"
     "David Kim: I'm worried about a delay on supplier requalification.\n\n"
     "3\n00:00:08.500 --> 00:00:11.000\n"
-    "David Kim: Priya will update the structural report by Friday.\n"
+    "David Kim: Priya will update the structural report by Friday.\n\n"
+    "4\n00:00:11.500 --> 00:00:14.000\n"
+    "David Kim: Should we requalify Supplier C as well?\n"
 )
 
 
@@ -113,6 +115,47 @@ def test_reject_keeps_artifact_out_of_memory(client, auth):
     r = review["risks"][0]
     resp = _resolve(client, mgr, mid, "risk", r["rid"], action="reject")
     assert resp.status_code == 200 and resp.json()["status"] == "rejected"
+
+
+def test_approve_action_returns_full_review_shape_then_409s(client, auth):
+    mgr = auth("morgan")
+    cid = _internal_classification(client, mgr)
+    mid = _imported_meeting(client, mgr, cid)["meeting"]["id"]
+    review = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()
+    a = review["actions"][0]
+    assert a["owner_name"] and a["turns"]  # sanity: extraction populated these
+
+    resp = _resolve(client, mgr, mid, "action", a["task_id"])
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "open"
+    # Same shape as the review payload item: owner_name/due_hint/turns present,
+    # not just task_id/title/status.
+    assert body["owner_name"] == a["owner_name"]
+    assert body["due_hint"] == a["due_hint"]
+    assert body["turns"] == a["turns"]
+
+    assert _resolve(client, mgr, mid, "action", a["task_id"]).status_code == 409
+
+
+def test_resolve_question_persists_status_then_409s(client, auth):
+    mgr = auth("morgan")
+    cid = _internal_classification(client, mgr)
+    mid = _imported_meeting(client, mgr, cid)["meeting"]["id"]
+    review = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()
+    q = review["questions"][0]
+    assert q["status"] == "proposed"
+
+    resp = _resolve(client, mgr, mid, "question", q["qid"], action="reject")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"
+
+    # The status change is persisted, not just returned once.
+    review_after = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()
+    persisted = next(x for x in review_after["questions"] if x["qid"] == q["qid"])
+    assert persisted["status"] == "rejected"
+
+    assert _resolve(client, mgr, mid, "question", q["qid"], action="reject").status_code == 409
 
 
 def test_approved_record_inherits_transcript_acl(client, auth):
