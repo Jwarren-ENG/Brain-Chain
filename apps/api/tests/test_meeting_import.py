@@ -1,0 +1,95 @@
+"""Transcript import: roles, parsing errors, ACLs, audit, meeting creation."""
+import io
+
+VTT = (
+    "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n"
+    "Maria Santos: We decided to switch the bracket to 7075 aluminum.\n\n"
+    "2\n00:00:04.500 --> 00:00:08.000\n"
+    "David Kim: Load analysis showed insufficient margin with 6061.\n"
+)
+
+
+def _import(client, headers, *, classification_id, filename="review.vtt", body=VTT, **fields):
+    data = {"title": "Bracket design review", "classification_id": classification_id,
+            "project": "Phoenix", **fields}
+    return client.post(
+        "/api/meetings/import",
+        data=data,
+        files={"file": (filename, io.BytesIO(body.encode()), "text/vtt")},
+        headers=headers,
+    )
+
+
+def _classification_at_level(client, headers, level):
+    # /api/governance/classifications is open to any authenticated user and
+    # returns {"items": [{"id", "name", "level", "description", "color"}]}.
+    resp = client.get("/api/governance/classifications", headers=headers)
+    assert resp.status_code == 200, resp.text
+    return next(c["id"] for c in resp.json()["items"] if c["level"] == level)
+
+
+def _internal_classification(client, headers):
+    return _classification_at_level(client, headers, 1)
+
+
+def test_employee_cannot_import(client, auth):
+    resp = _import(client, auth("avery"), classification_id="anything")
+    assert resp.status_code == 403
+
+
+def test_manager_import_creates_meeting_document_and_acl(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    resp = _import(client, headers, classification_id=cid)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["turn_count"] == 2
+    assert body["meeting"]["attendees"] == ["David Kim", "Maria Santos"]
+    # the transcript document is readable by the importer
+    doc = client.get(f"/api/documents/{body['document_id']}", headers=headers)
+    assert doc.status_code == 200
+    assert "7075 aluminum" in str(doc.json())
+    # turns are stored for provenance
+    assert body["meeting"]["extraction"]["turns"][0]["speaker"] == "Maria Santos"
+
+
+def test_unparseable_file_is_422_and_persists_nothing(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    before = client.get("/api/meetings", headers=headers).json()["items"]
+    resp = _import(client, headers, classification_id=cid,
+                   filename="junk.txt", body="no labels here\nat all\n")
+    assert resp.status_code == 422
+    after = client.get("/api/meetings", headers=headers).json()["items"]
+    assert len(after) == len(before)
+
+
+def test_unknown_classification_is_404(client, auth):
+    headers = auth("morgan")
+    resp = _import(client, headers, classification_id="nope")
+    assert resp.status_code == 404
+
+
+def test_importer_cannot_exceed_own_clearance(client, auth):
+    headers = auth("morgan")
+    # Morgan (manager, clearance 2) must not be able to import material at a
+    # classification above her own clearance (level 3, restricted), even
+    # though her role otherwise permits importing.
+    restricted_id = _classification_at_level(client, headers, 3)
+    resp = _import(client, headers, classification_id=restricted_id)
+    assert resp.status_code == 403
+
+
+def test_import_records_audit_event(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    resp = _import(client, headers, classification_id=cid, filename="audit.vtt")
+    assert resp.status_code == 200, resp.text
+    meeting_id = resp.json()["meeting"]["id"]
+    # riley (security_admin) can search the audit trail for the import event.
+    events = client.get(
+        "/api/audit", params={"action": "meeting.imported"}, headers=auth("riley")
+    )
+    assert events.status_code == 200, events.text
+    targets = [e["target_id"] for e in events.json()["items"]]
+    assert meeting_id in targets

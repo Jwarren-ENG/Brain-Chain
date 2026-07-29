@@ -17,6 +17,7 @@ from .routers import (
     insights,
     interviews,
     knowledge,
+    meetings,
 )
 
 logging.basicConfig(
@@ -80,5 +81,6 @@ for router in (
     interviews.assignments_router,
     admin.router,
     brainmap.router,
+    meetings.router,
 ):
     app.include_router(router, prefix="/api")
