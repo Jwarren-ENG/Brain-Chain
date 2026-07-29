@@ -57,6 +57,97 @@ def test_review_hidden_without_transcript_access(client, auth):
     assert resp.json() == missing.json()
 
 
+def _resolve(client, headers, meeting_id, kind, artifact_id, action="approve", edits=None):
+    return client.post(
+        f"/api/meetings/{meeting_id}/review/resolve",
+        json={"kind": kind, "artifact_id": artifact_id, "action": action,
+              "edits": edits or {}},
+        headers=headers,
+    )
+
+
+def test_employee_cannot_resolve(client, auth):
+    mgr = auth("morgan")
+    cid = _internal_classification(client, mgr)
+    body = _imported_meeting(client, mgr, cid)
+    mid = body["meeting"]["id"]
+    d = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()["decisions"][0]
+    emp = auth("avery")
+    assert _resolve(client, emp, mid, "decision", d["id"]).status_code == 403
+
+
+def test_approve_decision_publishes_searchable_record(client, auth):
+    mgr = auth("morgan")
+    cid = _internal_classification(client, mgr)
+    mid = _imported_meeting(client, mgr, cid)["meeting"]["id"]
+    d = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()["decisions"][0]
+
+    # Before approval: no decision-record document exists, so /ask can't cite one.
+    docs = client.get("/api/documents", params={"doc_type": "decision_log", "q": "7075"},
+                      headers=mgr).json()["items"]
+    before_ids = {x["id"] for x in docs}
+
+    resp = _resolve(client, mgr, mid, "decision", d["id"],
+                    edits={"rationale": "Load analysis showed insufficient margin."})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "active"
+
+    docs = client.get("/api/documents", params={"doc_type": "decision_log", "q": "7075"},
+                      headers=mgr).json()["items"]
+    new = [x for x in docs if x["id"] not in before_ids]
+    assert len(new) == 1
+    detail = client.get(f"/api/documents/{new[0]['id']}", headers=mgr).json()
+    text = str(detail)
+    assert "Why:" in text and "insufficient margin" in text
+    assert "Approved by:" in text
+
+    # Idempotence: second approval is a 409.
+    assert _resolve(client, mgr, mid, "decision", d["id"]).status_code == 409
+
+
+def test_reject_keeps_artifact_out_of_memory(client, auth):
+    mgr = auth("morgan")
+    cid = _internal_classification(client, mgr)
+    mid = _imported_meeting(client, mgr, cid)["meeting"]["id"]
+    review = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()
+    r = review["risks"][0]
+    resp = _resolve(client, mgr, mid, "risk", r["rid"], action="reject")
+    assert resp.status_code == 200 and resp.json()["status"] == "rejected"
+
+
+def test_approved_record_inherits_transcript_acl(client, auth):
+    # Restricted import: approved record must stay invisible to low clearance.
+    # lena.hart is the L3 (manager, clearance 3) importer persona per
+    # test_meeting_import.py's test_review_hidden_without_transcript_access —
+    # riley.novak is security_admin-only and holds no import role.
+    mgr = auth("lena")
+    cid = _restricted_classification(client, mgr)
+    mid = _imported_meeting(client, mgr, cid)["meeting"]["id"]
+    d = client.get(f"/api/meetings/{mid}/review", headers=mgr).json()["decisions"][0]
+    before_ids = {x["id"] for x in client.get(
+        "/api/documents", params={"doc_type": "decision_log", "q": "7075"},
+        headers=mgr).json()["items"]}
+
+    assert _resolve(client, mgr, mid, "decision", d["id"]).status_code == 200
+
+    # The session's other tests may already have published unrelated,
+    # lower-classification decision_log records that also match q=7075 (and
+    # ARE legitimately visible to avery), so we isolate the record this test
+    # created rather than asserting the whole result set is empty.
+    after_ids = {x["id"] for x in client.get(
+        "/api/documents", params={"doc_type": "decision_log", "q": "7075"},
+        headers=mgr).json()["items"]}
+    new_ids = after_ids - before_ids
+    assert len(new_ids) == 1
+    record_id = next(iter(new_ids))
+
+    emp = auth("avery")
+    docs = client.get("/api/documents", params={"doc_type": "decision_log", "q": "7075"},
+                      headers=emp).json()["items"]
+    assert record_id not in {x["id"] for x in docs}  # unauthorized user never sees the record
+    assert client.get(f"/api/documents/{record_id}", headers=emp).status_code == 404
+
+
 def test_review_tolerates_hand_authored_history_with_turns_only(client, auth):
     """Seeded meetings may carry extraction with only 'turns' (no decisions/
     actions/risks/questions/summary keys). The endpoint must not KeyError."""

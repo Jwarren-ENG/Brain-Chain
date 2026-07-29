@@ -2,10 +2,12 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import (
+    AccessControlEntry,
     DataSource,
     Decision,
     Department,
@@ -250,3 +252,120 @@ def meeting_review(meeting_id: str, user: User = Depends(get_current_user),
                       for q in ext.get("questions", [])],
         "dropped": ext.get("dropped", []),
     }
+
+
+class ResolveRequest(BaseModel):
+    kind: str = Field(pattern="^(decision|action|risk|question)$")
+    artifact_id: str
+    action: str = Field(pattern="^(approve|reject)$")
+    edits: dict = Field(default_factory=dict)
+
+
+def _copy_acl(db: Session, from_doc_id: str) -> list[tuple[str, str]]:
+    aces = (db.query(AccessControlEntry)
+            .filter(AccessControlEntry.document_id == from_doc_id).all())
+    return [(a.principal_type, a.principal_id) for a in aces]
+
+
+def _publish_decision_record(db: Session, user: User, meeting: Meeting,
+                             transcript_doc: Document, decision: Decision) -> str:
+    """The only place a decision-record document is created — approval is the
+    sole path from proposed knowledge to a retrievable memory."""
+    turn_ids = (decision.details or {}).get("turn_ids", [])
+    alternatives = (decision.details or {}).get("alternatives", [])
+    held = meeting.held_at.strftime("%Y-%m-%d") if meeting.held_at else "unknown date"
+    content = (
+        f"Decision: {decision.title}\n\n"
+        f"What happened: {decision.title}\n\n"
+        f"Why: {decision.rationale or 'No rationale recorded.'}\n\n"
+        f"Alternatives considered: {', '.join(alternatives) or 'None recorded'}\n\n"
+        f"Approved by: {user.name} ({user.title or 'reviewer'}) on "
+        f"{utcnow().strftime('%Y-%m-%d')}\n\n"
+        f"Evidence: meeting “{meeting.title}” ({held}), transcript turns "
+        f"{', '.join(f'T{i}' for i in turn_ids) or 'n/a'}"
+    )
+    record_doc = ingest_document(
+        db,
+        org_id=meeting.org_id,
+        title=f"Decision record — {decision.title[:120]}",
+        content=content,
+        doc_type="decision_log",
+        classification_id=transcript_doc.classification_id,
+        data_source_id=transcript_doc.data_source_id,
+        department_id=transcript_doc.department_id,
+        owner_user_id=user.id,
+        meta={"project": decision.project, "decision_id": decision.id,
+              "meeting_id": meeting.id},
+        acl=_copy_acl(db, transcript_doc.id),
+        confidence=0.95,
+    )
+    return record_doc.id
+
+
+@router.post("/meetings/{meeting_id}/review/resolve")
+def resolve_artifact(
+    meeting_id: str,
+    body: ResolveRequest,
+    user: User = Depends(require_roles("manager", "executive")),
+    db: Session = Depends(get_db),
+):
+    """Human approval is the ONLY path from proposed knowledge to retrievable
+    memory: approving a decision publishes an ACL-inherited decision-record
+    document; rejection publishes nothing. Every resolution is audited."""
+    meeting = _reviewable_meeting(meeting_id, user, db)
+    transcript_doc = db.get(Document, meeting.transcript_document_id)
+    turns_map = _turns_by_idx(meeting)
+    approve = body.action == "approve"
+
+    if body.kind == "decision":
+        row = db.get(Decision, body.artifact_id)
+        if not row or row.meeting_id != meeting.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Artifact not found")
+        if row.status != "proposed":
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Already {row.status}")
+        if "title" in body.edits:
+            row.title = str(body.edits["title"])[:400]
+        if "rationale" in body.edits:
+            row.rationale = str(body.edits["rationale"])
+        if approve:
+            row.status = "active"
+            if user.name not in row.owners:
+                row.owners = [*row.owners, user.name]
+            record_id = _publish_decision_record(db, user, meeting, transcript_doc, row)
+            row.sources = [*row.sources, record_id]
+        else:
+            row.status = "rejected"
+        result = {"id": row.id, "title": row.title, "rationale": row.rationale,
+                  "status": row.status,
+                  "turns": _resolve_turns((row.details or {}).get("turn_ids", []), turns_map)}
+    elif body.kind == "action":
+        row = db.get(Task, body.artifact_id)
+        if not row or row.meeting_id != meeting.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Artifact not found")
+        if row.status != "proposed":
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Already {row.status}")
+        if "title" in body.edits:
+            row.title = str(body.edits["title"])[:400]
+        row.status = "open" if approve else "cancelled"
+        result = {"task_id": row.id, "title": row.title, "status": row.status}
+    else:  # risk | question — stored in meeting.extraction JSON
+        key = "risks" if body.kind == "risk" else "questions"
+        id_field = "rid" if body.kind == "risk" else "qid"
+        ext = dict(meeting.extraction or {})
+        items = [dict(i) for i in ext.get(key, [])]
+        match = next((i for i in items if i.get(id_field) == body.artifact_id), None)
+        if not match:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Artifact not found")
+        if match.get("status") != "proposed":
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Already {match.get('status')}")
+        if "title" in body.edits:
+            match["text"] = str(body.edits["title"])[:400]
+        match["status"] = "confirmed" if approve else "rejected"
+        ext[key] = items
+        meeting.extraction = ext  # reassign so the JSON change is detected
+        result = {**match, "turns": _resolve_turns(match.get("turn_ids", []), turns_map)}
+
+    audit.record(db, user.org_id, f"meeting.artifact.{body.action}", actor_user_id=user.id,
+                target_type="meeting", target_id=meeting.id,
+                meta={"kind": body.kind, "artifact_id": body.artifact_id}, commit=True)
+    return result
