@@ -315,6 +315,73 @@ export interface MeetingImportResponse {
   counts?: { decisions: number; actions: number; risks: number; questions: number };
 }
 
+/** Mirrors `GET /api/meetings/{id}/review` (Task 13) verbatim. */
+export interface ReviewTurnInfo {
+  idx: number;
+  speaker: string;
+  text: string;
+}
+
+export interface ReviewDecisionArtifact {
+  id: string;
+  title: string;
+  rationale: string;
+  alternatives: string[];
+  decided_by: string;
+  status: string;
+  turns: ReviewTurnInfo[];
+}
+
+export interface ReviewActionArtifact {
+  task_id: string;
+  title: string;
+  owner_name: string;
+  due_hint: string;
+  status: string;
+  turns: ReviewTurnInfo[];
+}
+
+export interface ReviewRiskArtifact {
+  rid: string;
+  text: string;
+  severity: string;
+  status: string;
+  turns: ReviewTurnInfo[];
+}
+
+export interface ReviewQuestionArtifact {
+  qid: string;
+  text: string;
+  raised_by: string;
+  status: string;
+  turns: ReviewTurnInfo[];
+}
+
+/** Kind-tagged union of every artifact shape the review queue can render. */
+export type ReviewArtifact =
+  | ({ kind: "decision" } & ReviewDecisionArtifact)
+  | ({ kind: "action" } & ReviewActionArtifact)
+  | ({ kind: "risk" } & ReviewRiskArtifact)
+  | ({ kind: "question" } & ReviewQuestionArtifact);
+
+export interface MeetingReviewPayload {
+  meeting: MeetingInfo;
+  summary: string;
+  decisions: ReviewDecisionArtifact[];
+  actions: ReviewActionArtifact[];
+  risks: ReviewRiskArtifact[];
+  questions: ReviewQuestionArtifact[];
+  dropped: string[];
+}
+
+/** Body for `POST /api/meetings/{id}/review/resolve` (Task 14). */
+export interface ResolveArtifactRequest {
+  kind: "decision" | "action" | "risk" | "question";
+  artifact_id: string;
+  action: "approve" | "reject";
+  edits: { title?: string; rationale?: string };
+}
+
 export interface DecisionInfo {
   id: string;
   title: string;

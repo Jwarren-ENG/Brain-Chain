@@ -207,9 +207,17 @@ export default function MeetingsPage() {
                       <CalendarDays className="size-3" /> {formatDate(meeting.held_at)} · {meeting.attendees.length} attendees · via {meeting.source}
                     </p>
                   </button>
-                  <Button variant="secondary" size="sm" onClick={() => setReflectionOpen(meeting)}>
-                    <Mic2 className="size-3.5" /> Share reflection
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/meetings/${meeting.id}/review`}
+                      className="text-xs font-medium text-accent hover:underline"
+                    >
+                      Review knowledge
+                    </Link>
+                    <Button variant="secondary" size="sm" onClick={() => setReflectionOpen(meeting)}>
+                      <Mic2 className="size-3.5" /> Share reflection
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <ExtractStat icon={<Landmark className="size-3.5" />} label="Decisions" value={extraction.decisions?.length ?? 0} />
