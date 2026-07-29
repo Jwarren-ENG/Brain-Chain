@@ -1,0 +1,11 @@
+{
+  "name": "brainchain",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter @brainchain/web dev",
+    "build:web": "pnpm --filter @brainchain/web build",
+    "lint:web": "pnpm --filter @brainchain/web lint",
+    "typecheck:web": "pnpm --filter @brainchain/web typecheck",
+    "test:web": "pnpm --filter @brainchain/web test"
+  }
+}

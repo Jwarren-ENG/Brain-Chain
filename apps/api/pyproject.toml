@@ -1,0 +1,22 @@
+[project]
+name = "brainchain-api"
+version = "0.1.0"
+description = "BrainChain — secure enterprise intelligence platform (API)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is idiomatic
+
+[tool.ruff.lint.per-file-ignores]
+# Seed data and generated migrations carry long realistic content strings.
+"app/seed.py" = ["E501"]
+"alembic/versions/*" = ["E501", "W291"]

@@ -1,0 +1,14 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+pydantic>=2.7
+pydantic-settings>=2.2
+email-validator>=2.1
+alembic>=1.13
+httpx>=0.27
+python-multipart>=0.0.9
+
+# Postgres profile (docker compose / production) — uncomment when using
+# infrastructure/docker-compose.yml with DATABASE_URL=postgresql+psycopg://...
+# psycopg[binary]>=3.1
+# pgvector>=0.2

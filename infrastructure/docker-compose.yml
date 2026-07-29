@@ -1,0 +1,79 @@
+# BrainChain full-profile local stack: Postgres + pgvector, Redis, MinIO,
+# API and web. The zero-dependency dev path (SQLite + in-process worker)
+# does not need this file — see README "Quick start".
+#
+#   docker compose -f infrastructure/docker-compose.yml up --build
+#
+# Copy infrastructure/.env.example to infrastructure/.env first. Never commit
+# real credentials.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-brainchain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in infrastructure/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-brainchain}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-brainchain}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-brainchain}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in infrastructure/.env}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  api:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.api
+    environment:
+      BRAINCHAIN_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-brainchain}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-brainchain}
+      BRAINCHAIN_SECRET_KEY: ${BRAINCHAIN_SECRET_KEY:?set in infrastructure/.env}
+      BRAINCHAIN_DEPLOYMENT_PROFILE: ${BRAINCHAIN_DEPLOYMENT_PROFILE:-commercial}
+      BRAINCHAIN_CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  miniodata:
