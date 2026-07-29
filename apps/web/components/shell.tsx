@@ -1,6 +1,7 @@
 "use client";
 
 import { api, setStoredUser, setToken } from "@/lib/api";
+import { ASSISTANT_NAME } from "@/lib/brand";
 import { cn, hasRole } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { FileSearch, LogOut, Moon, Search, Settings, Sparkles, Sun } from "lucide-react";
@@ -272,7 +273,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
               }
               if (e.key === "Escape") onClose();
             }}
-            placeholder="Search knowledge, or press Enter to ask the brain…"
+            placeholder={`Search knowledge, or press Enter to ask ${ASSISTANT_NAME}...`}
             className="h-12 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
           />
         </div>
@@ -283,7 +284,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-ink hover:bg-panel-2"
             >
               <Sparkles className="size-4 text-accent" />
-              Ask the brain: <span className="font-medium">“{query.trim()}”</span>
+              Ask ${ASSISTANT_NAME}: <span className="font-medium">“{query.trim()}”</span>
             </button>
           )}
           {data?.results.map((r) => (

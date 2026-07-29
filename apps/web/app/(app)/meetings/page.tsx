@@ -4,7 +4,7 @@ import { ContributeMenu } from "@/components/contribute-menu";
 import { useSession } from "@/components/providers";
 import { CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
 import { api, apiUpload } from "@/lib/api";
-import { ASSISTANT_NAME } from "@/lib/brand";
+import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { Classification, MeetingImportResponse, MeetingInfo } from "@brainchain/shared";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -92,7 +92,7 @@ export default function MeetingsPage() {
               onReflect={() => setReflectionOpen(meeting)}
             />
           ))}
-          {data && !data.items.length && <EmptyState title="No meeting memory yet" body="Connect Zoom or Teams to automatically capture decisions and follow-through." />}
+          {data && !data.items.length && <EmptyState title="No meeting memory yet" body="Import a recording or transcript to get started." />}
         </div>
       )}
 
@@ -100,7 +100,7 @@ export default function MeetingsPage() {
         {reflectionOpen && (
           <div className="space-y-3">
             <p className="text-xs leading-relaxed text-ink-3">
-              What landed well? What was left unsaid? {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)}{" "}
+              What landed well? What was left unsaid? {ASSISTANT_NAME_CAPITALIZED}{" "}
               asks a few questions and you review what it understood before anything is shared.
               Reflections join the protected outcome memory — anonymous text is available.
             </p>

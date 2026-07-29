@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { ASSISTANT_NAME } from "../../../lib/brand";
+import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "../../../lib/brand";
 import { Card, Badge } from "../../../components/ui";
 
 export function InvitePanel({ importSlot }: { importSlot: React.ReactNode }) {
@@ -11,7 +11,7 @@ export function InvitePanel({ importSlot }: { importSlot: React.ReactNode }) {
         <Badge tone="accent">next release</Badge>
       </div>
       <p className="text-sm leading-relaxed text-ink-2">
-        {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} will join your Zoom, Meet, and
+        {ASSISTANT_NAME_CAPITALIZED} will join your Zoom, Meet, and
         Teams calls in the next release — listening, taking notes, and answering when called on.
         Today, import a recording or transcript and it remembers everything just the same.
       </p>

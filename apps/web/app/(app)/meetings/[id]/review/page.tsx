@@ -3,7 +3,7 @@
 import { useSession } from "@/components/providers";
 import { Card, CardSkeleton, ErrorState, InfoNote } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ASSISTANT_NAME } from "@/lib/brand";
+import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { MeetingReviewPayload, ResolveArtifactRequest } from "@brainchain/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -199,7 +199,7 @@ export default function MeetingReviewPage() {
 
       {!hasArtifacts && !extractionError && (
         <Card className="p-6 text-center text-sm text-ink-2">
-          {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} didn't capture any structured
+          {ASSISTANT_NAME_CAPITALIZED} didn't capture any structured
           knowledge from this transcript — only the raw turns were stored. There's nothing to
           review yet.
         </Card>

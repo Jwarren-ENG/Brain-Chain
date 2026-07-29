@@ -17,7 +17,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ASSISTANT_NAME } from "@/lib/brand";
+import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import type {
   InterviewArtifactInfo,
   InterviewSessionInfo,
@@ -445,7 +445,7 @@ function TextWorkspace({
         <DeleteButton sessionId={session.id} receipt={receipt} label="Discard" />
         {envelope?.can_complete && (
           <span className="text-[11px] text-good">
-            {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} has enough to work with
+            {ASSISTANT_NAME_CAPITALIZED} has enough to work with
             whenever you're ready.
           </span>
         )}
@@ -667,7 +667,7 @@ function ReviewWorkspace({
 
       {!artifacts.length && (
         <Card className="p-6 text-center text-sm text-ink-2">
-          {ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1)} didn't find anything
+          {ASSISTANT_NAME_CAPITALIZED} didn't find anything
           substantial in this conversation. You can discard the session, or delete it entirely.
         </Card>
       )}

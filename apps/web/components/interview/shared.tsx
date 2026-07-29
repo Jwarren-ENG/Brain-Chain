@@ -5,7 +5,7 @@
  * are unit-testable without the API. */
 
 import { Badge, Card } from "@/components/ui";
-import { ASSISTANT_NAME } from "@/lib/brand";
+import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import type {
   InterviewArtifactInfo,
@@ -36,8 +36,6 @@ import {
   Wrench,
 } from "lucide-react";
 import * as React from "react";
-
-const AssistantName = ASSISTANT_NAME[0].toUpperCase() + ASSISTANT_NAME.slice(1);
 
 /* ------------------------------------------------------------- purposes */
 
@@ -263,33 +261,33 @@ export const ARTIFACT_KIND_META: Record<
   string,
   { label: string; sentence: string; icon: React.ReactNode; group: string }
 > = {
-  claim: { label: "Fact", sentence: `${AssistantName} understood this as a fact.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
-  process_step: { label: "Process step", sentence: `${AssistantName} understood this as a step in the process.`, icon: <Route className="size-3.5" />, group: "Process" },
-  process_exception: { label: "Exception", sentence: `${AssistantName} understood this as an exception.`, icon: <GitBranch className="size-3.5" />, group: "Process" },
-  workaround: { label: "Workaround", sentence: `${AssistantName} understood this as an undocumented workaround.`, icon: <Wrench className="size-3.5" />, group: "Process" },
-  risk: { label: "Risk", sentence: `${AssistantName} understood this as a risk.`, icon: <AlertTriangle className="size-3.5" />, group: "Signals" },
-  friction: { label: "Friction", sentence: `${AssistantName} understood this as recurring friction.`, icon: <AlertTriangle className="size-3.5" />, group: "Signals" },
-  idea: { label: "Idea", sentence: `${AssistantName} understood this as an improvement idea.`, icon: <Lightbulb className="size-3.5" />, group: "Signals" },
-  decision: { label: "Proposed decision", sentence: `${AssistantName} understood this as a proposed decision.`, icon: <Landmark className="size-3.5" />, group: "Decision" },
-  decision_alternative: { label: "Alternative", sentence: `${AssistantName} understood this as an alternative that was considered.`, icon: <GitBranch className="size-3.5" />, group: "Decision" },
-  decision_rationale: { label: "Rationale", sentence: `${AssistantName} understood this as the reasoning behind the decision.`, icon: <BookOpenCheck className="size-3.5" />, group: "Decision" },
-  dissent: { label: "Dissent", sentence: `${AssistantName} understood this as recorded disagreement.`, icon: <AlertTriangle className="size-3.5" />, group: "Decision" },
-  assumption: { label: "Assumption", sentence: `${AssistantName} understood this as an assumption the plan depends on.`, icon: <CircleHelp className="size-3.5" />, group: "Decision" },
-  success_metric: { label: "Success metric", sentence: `${AssistantName} understood this as how success will be measured.`, icon: <Check className="size-3.5" />, group: "Decision" },
-  action_item: { label: "Action item", sentence: `${AssistantName} understood this as a commitment to act.`, icon: <ListChecks className="size-3.5" />, group: "Actions" },
-  open_question: { label: "Open question", sentence: `${AssistantName} understood this as an unresolved question.`, icon: <CircleHelp className="size-3.5" />, group: "Actions" },
-  expert_heuristic: { label: "Expert heuristic", sentence: `${AssistantName} understood this as expert judgment worth preserving.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
-  lesson: { label: "Lesson", sentence: `${AssistantName} understood this as a lesson for the future.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
-  entity_relationship: { label: "Relationship", sentence: `${AssistantName} understood this as a relationship between things.`, icon: <GitBranch className="size-3.5" />, group: "Knowledge" },
-  meeting_topic: { label: "Meeting topic", sentence: `${AssistantName} understood this as a topic for the meeting.`, icon: <CalendarDays className="size-3.5" />, group: "Meeting" },
-  meeting_reflection: { label: "Meeting reflection", sentence: `${AssistantName} understood this as a reflection on how it went.`, icon: <CalendarDays className="size-3.5" />, group: "Meeting" },
+  claim: { label: "Fact", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a fact.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
+  process_step: { label: "Process step", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a step in the process.`, icon: <Route className="size-3.5" />, group: "Process" },
+  process_exception: { label: "Exception", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an exception.`, icon: <GitBranch className="size-3.5" />, group: "Process" },
+  workaround: { label: "Workaround", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an undocumented workaround.`, icon: <Wrench className="size-3.5" />, group: "Process" },
+  risk: { label: "Risk", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a risk.`, icon: <AlertTriangle className="size-3.5" />, group: "Signals" },
+  friction: { label: "Friction", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as recurring friction.`, icon: <AlertTriangle className="size-3.5" />, group: "Signals" },
+  idea: { label: "Idea", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an improvement idea.`, icon: <Lightbulb className="size-3.5" />, group: "Signals" },
+  decision: { label: "Proposed decision", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a proposed decision.`, icon: <Landmark className="size-3.5" />, group: "Decision" },
+  decision_alternative: { label: "Alternative", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an alternative that was considered.`, icon: <GitBranch className="size-3.5" />, group: "Decision" },
+  decision_rationale: { label: "Rationale", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as the reasoning behind the decision.`, icon: <BookOpenCheck className="size-3.5" />, group: "Decision" },
+  dissent: { label: "Dissent", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as recorded disagreement.`, icon: <AlertTriangle className="size-3.5" />, group: "Decision" },
+  assumption: { label: "Assumption", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an assumption the plan depends on.`, icon: <CircleHelp className="size-3.5" />, group: "Decision" },
+  success_metric: { label: "Success metric", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as how success will be measured.`, icon: <Check className="size-3.5" />, group: "Decision" },
+  action_item: { label: "Action item", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a commitment to act.`, icon: <ListChecks className="size-3.5" />, group: "Actions" },
+  open_question: { label: "Open question", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as an unresolved question.`, icon: <CircleHelp className="size-3.5" />, group: "Actions" },
+  expert_heuristic: { label: "Expert heuristic", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as expert judgment worth preserving.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
+  lesson: { label: "Lesson", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a lesson for the future.`, icon: <BookOpenCheck className="size-3.5" />, group: "Knowledge" },
+  entity_relationship: { label: "Relationship", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a relationship between things.`, icon: <GitBranch className="size-3.5" />, group: "Knowledge" },
+  meeting_topic: { label: "Meeting topic", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a topic for the meeting.`, icon: <CalendarDays className="size-3.5" />, group: "Meeting" },
+  meeting_reflection: { label: "Meeting reflection", sentence: `${ASSISTANT_NAME_CAPITALIZED} understood this as a reflection on how it went.`, icon: <CalendarDays className="size-3.5" />, group: "Meeting" },
 };
 
 export function kindMeta(kind: InterviewArtifactKind) {
   return (
     ARTIFACT_KIND_META[kind] ?? {
       label: kind,
-      sentence: `${AssistantName} picked this up from your words.`,
+      sentence: `${ASSISTANT_NAME_CAPITALIZED} picked this up from your words.`,
       icon: <BookOpenCheck className="size-3.5" />,
       group: "Knowledge",
     }

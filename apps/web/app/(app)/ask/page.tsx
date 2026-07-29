@@ -4,6 +4,7 @@ import { DocumentDrawer } from "@/components/document";
 import { EvidencePanel, SEGMENT_META, SegmentLegend } from "@/components/evidence";
 import { Badge, Button, Card, ErrorState, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import type { HomeData, Message } from "@brainchain/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -121,7 +122,7 @@ function AskPageInner() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-lg font-semibold text-ink">
-              <Sparkles className="size-5 text-accent" /> Ask the Brain
+              <Sparkles className="size-5 text-accent" /> Ask {ASSISTANT_NAME_CAPITALIZED}
             </h1>
             <p className="text-xs text-ink-3">
               Answers come only from sources you are authorized to read, with citations.

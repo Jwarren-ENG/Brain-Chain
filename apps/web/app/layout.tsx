@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { PRODUCT_NAME } from "@/lib/brand";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "Company Brain — Shared intelligence for every team",
+  title: `${PRODUCT_NAME} — Shared intelligence for every team`,
   description:
     "A living, permission-aware company brain that turns knowledge, meetings, feedback, and work into better decisions.",
 };
