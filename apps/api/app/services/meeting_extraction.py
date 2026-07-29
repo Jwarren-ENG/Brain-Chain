@@ -185,15 +185,20 @@ class AnthropicExtractionProvider:
         client = self._client_factory()
         last_error = None
         for _attempt in range(2):
-            message = client.messages.create(
-                model=self.model,
-                max_tokens=4000,
-                system=_EXTRACTION_SYSTEM,
-                tools=[_extraction_tool_schema()],
-                tool_choice={"type": "tool", "name": "emit_extraction"},
-                messages=[{"role": "user",
-                           "content": f"<transcript>\n{transcript}\n</transcript>"}],
-            )
+            try:
+                message = client.messages.create(
+                    model=self.model,
+                    max_tokens=4000,
+                    system=_EXTRACTION_SYSTEM,
+                    tools=[_extraction_tool_schema()],
+                    tool_choice={"type": "tool", "name": "emit_extraction"},
+                    messages=[{"role": "user",
+                               "content": f"<transcript>\n{transcript}\n</transcript>"}],
+                )
+            except Exception as exc:  # noqa: BLE001 - never let a raw provider
+                # exception (auth error, connection failure, ...) escape past
+                # this boundary; callers catch only ExtractionError.
+                raise ExtractionError(f"Anthropic API call failed: {exc}") from exc
             payload = next(
                 (b.input for b in message.content
                  if getattr(b, "type", "") == "tool_use" and b.name == "emit_extraction"),
@@ -212,7 +217,7 @@ def get_extraction_provider(provider=None):
     from ..config import get_settings
 
     settings = get_settings()
-    if settings.anthropic_api_key:
+    if settings.anthropic_api_key and settings.external_models_allowed:
         return AnthropicExtractionProvider(settings.anthropic_api_key,
                                            settings.anthropic_model)
     return MockExtractionProvider()
@@ -224,3 +229,73 @@ def extract_meeting(
     """Run extraction with the active provider and enforce the turn-ref invariant."""
     extraction = get_extraction_provider(provider).extract(turns)
     return validate_against_turns(extraction, turns)
+
+
+# ---------------------------------------------------------------- persistence
+
+# Seed-time ingestion is curated, pre-approved history — it may auto-confirm
+# extracted artifacts as already-active. Live imports and connector syncs
+# always land proposed regardless of this flag. Toggled True only inside
+# app/seed.py, around its transcript-processing calls.
+SEED_AUTO_CONFIRM = False
+
+
+def persist_extraction(db, meeting, transcript_doc, extraction: MeetingExtraction,
+                       dropped: list[str], *, auto_confirm: bool = False) -> dict:
+    from ..models import Decision, Task
+
+    auto_confirm = auto_confirm or SEED_AUTO_CONFIRM
+    project = (transcript_doc.meta or {}).get("project", "")
+    decision_refs, action_refs = [], []
+    for d in extraction.decisions:
+        row = Decision(
+            org_id=meeting.org_id,
+            title=d.statement[:400],
+            decided_at=meeting.held_at,
+            rationale=d.rationale,
+            status="active" if auto_confirm else "proposed",
+            meeting_id=meeting.id,
+            document_id=transcript_doc.id,
+            project=project,
+            owners=[d.decided_by] if d.decided_by else [],
+            sources=[transcript_doc.id],
+            details={"alternatives": d.alternatives, "turn_ids": d.turn_ids,
+                     "decided_by": d.decided_by},
+        )
+        db.add(row)
+        db.flush()
+        decision_refs.append({"id": row.id, "turn_ids": d.turn_ids})
+    for a in extraction.actions:
+        desc = f"Extracted from meeting “{meeting.title}”."
+        if a.owner_name:
+            desc += f" Owner mentioned: {a.owner_name}."
+        if a.due_hint:
+            desc += f" Due hint: {a.due_hint}."
+        row = Task(
+            org_id=meeting.org_id, title=a.description[:400], description=desc,
+            status="open" if auto_confirm else "proposed",
+            source="meeting", meeting_id=meeting.id, project=project,
+        )
+        db.add(row)
+        db.flush()
+        action_refs.append({"task_id": row.id, "turn_ids": a.turn_ids,
+                            "owner_name": a.owner_name, "due_hint": a.due_hint})
+
+    status = "confirmed" if auto_confirm else "proposed"
+    meeting.extraction = {
+        **(meeting.extraction or {}),
+        "summary": extraction.summary,
+        "decisions": decision_refs,
+        "actions": action_refs,
+        "risks": [{"rid": f"r{i}", "text": r.description, "severity": r.severity,
+                   "status": status, "turn_ids": r.turn_ids}
+                  for i, r in enumerate(extraction.risks)],
+        "questions": [{"qid": f"q{i}", "text": q.question, "raised_by": q.raised_by,
+                       "status": status, "turn_ids": q.turn_ids}
+                      for i, q in enumerate(extraction.questions)],
+        "dropped": dropped,
+    }
+    db.flush()
+    return {"decisions": len(decision_refs), "actions": len(action_refs),
+            "risks": len(extraction.risks), "questions": len(extraction.questions),
+            "dropped": len(dropped)}

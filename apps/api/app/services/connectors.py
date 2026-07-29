@@ -7,91 +7,28 @@ Live credentials would replace the MockUpstream fetch only — parsing,
 extraction, permission mapping and storage are already the real path.
 
 The Zoom connector demonstrates full transcript processing: speaker-turn
-parsing plus rule-based extraction of decisions, action items, owners,
-deadlines, risks and open questions into first-class records.
+parsing plus LLM-backed extraction (`meeting_extraction.extract_meeting` /
+`persist_extraction`, keyless-mock fallback included) of decisions, action
+items, owners, due hints, risks and open questions — landed as proposed
+knowledge pending review.
 """
 from __future__ import annotations
 
-import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from ..models import (
     Connector,
     DataSource,
-    Decision,
     Meeting,
     SourceItem,
     SyncJob,
-    Task,
     User,
     utcnow,
 )
 from ..security.audit import record
 from .ingestion import ingest_document
-
-# ------------------------------------------------------ transcript extraction
-
-_DECISION_RE = re.compile(
-    r"\b(we(?:'ve| have)? decided|decision(?: is)?:|agreed (?:that|to)|we're going with|"
-    r"final call:|let's lock in)\b(.*)",
-    re.IGNORECASE,
-)
-_ACTION_RE = re.compile(
-    r"\b(?:action(?: item)?:|(?:i|we|you)(?:'ll| will) take|(\w[\w .'-]*?) (?:will|to) "
-    r"(?:own|handle|draft|update|follow up|send|schedule|review|complete))\b(.*)",
-    re.IGNORECASE,
-)
-_RISK_RE = re.compile(
-    r"\b(risk|blocker|blocked|concern|worried|slip|delay|behind schedule|shortage)\b",
-    re.IGNORECASE,
-)
-_QUESTION_RE = re.compile(r"\?\s*$")
-_DEADLINE_RE = re.compile(
-    r"\bby (?:(?:end of|eo)\s*)?(monday|tuesday|wednesday|thursday|friday|next week|"
-    r"friday|month end|q[1-4]|[a-z]+ \d{1,2})\b",
-    re.IGNORECASE,
-)
-
-
-def parse_transcript(text: str) -> list[tuple[str, str]]:
-    """Parse `Speaker: utterance` lines into (speaker, utterance) turns."""
-    turns = []
-    for line in text.splitlines():
-        line = line.strip()
-        m = re.match(r"^([A-Z][\w .'-]{1,40}):\s+(.*)$", line)
-        if m:
-            turns.append((m.group(1).strip(), m.group(2).strip()))
-    return turns
-
-
-def extract_from_transcript(text: str) -> dict:
-    turns = parse_transcript(text)
-    decisions, actions, risks, questions = [], [], [], []
-    for speaker, utterance in turns:
-        if _DECISION_RE.search(utterance):
-            decisions.append({"text": utterance, "speaker": speaker})
-        m = _ACTION_RE.search(utterance)
-        if m:
-            owner = (m.group(1) or speaker).strip()
-            deadline = None
-            dm = _DEADLINE_RE.search(utterance)
-            if dm:
-                deadline = dm.group(1)
-            actions.append({"text": utterance, "owner": owner, "deadline": deadline})
-        if _RISK_RE.search(utterance):
-            risks.append({"text": utterance, "speaker": speaker})
-        if _QUESTION_RE.search(utterance):
-            questions.append({"text": utterance, "speaker": speaker})
-    return {
-        "decisions": decisions,
-        "action_items": actions,
-        "risks": risks,
-        "open_questions": questions,
-        "speakers": sorted({s for s, _ in turns}),
-    }
-
 
 # ------------------------------------------------------------- sync execution
 
@@ -208,7 +145,11 @@ def _ingest_item(db: Session, connector: Connector, item: dict, log: list[dict])
     log.append({"t": utcnow().isoformat(), "msg": f"Ingested “{doc.title}” ({doc.doc_type})"})
 
     if item.get("kind") == "transcript":
-        extraction = extract_from_transcript(item.get("content", ""))
+        from .meeting_extraction import ExtractionError, extract_meeting, persist_extraction
+        from .transcripts import parse_transcript_file, turns_to_meta
+
+        turns = parse_transcript_file(item.get("title", "t.txt") + ".txt",
+                                      item.get("content", ""))
         meeting = Meeting(
             org_id=connector.org_id,
             title=item.get("title", "Meeting"),
@@ -216,50 +157,22 @@ def _ingest_item(db: Session, connector: Connector, item: dict, log: list[dict])
             source=connector.provider,
             transcript_document_id=doc.id,
             department_id=source.department_id,
-            attendees=extraction["speakers"],
-            extraction=extraction,
+            attendees=sorted({t.speaker for t in turns}),
+            extraction={"turns": turns_to_meta(turns)},
         )
         db.add(meeting)
         db.flush()
-        for d in extraction["decisions"]:
-            db.add(
-                Decision(
-                    org_id=connector.org_id,
-                    title=d["text"][:400],
-                    decided_at=meeting.held_at,
-                    rationale=f"Recorded in “{meeting.title}” by {d['speaker']}.",
-                    meeting_id=meeting.id,
-                    document_id=doc.id,
-                    project=item.get("meta", {}).get("project", ""),
-                    owners=[d["speaker"]],
-                    sources=[doc.id],
-                )
-            )
-        for a in extraction["action_items"]:
-            db.add(
-                Task(
-                    org_id=connector.org_id,
-                    title=a["text"][:400],
-                    description=f"Extracted from meeting “{meeting.title}”."
-                    + (f" Deadline mentioned: {a['deadline']}." if a.get("deadline") else ""),
-                    status="open",
-                    source="meeting",
-                    meeting_id=meeting.id,
-                    project=item.get("meta", {}).get("project", ""),
-                    due_date=_deadline_to_date(a.get("deadline")),
-                )
-            )
-        log.append(
-            {
-                "t": utcnow().isoformat(),
-                "msg": (
-                    f"Transcript processed: {len(extraction['decisions'])} decisions, "
-                    f"{len(extraction['action_items'])} action items, "
-                    f"{len(extraction['risks'])} risk mentions, "
-                    f"{len(extraction['open_questions'])} open questions"
-                ),
-            }
-        )
+        try:
+            extraction, dropped = extract_meeting(turns)
+            counts = persist_extraction(db, meeting, doc, extraction, dropped)
+            log.append({"t": utcnow().isoformat(),
+                        "msg": (f"Transcript processed: {counts['decisions']} decisions, "
+                                f"{counts['actions']} action items, {counts['risks']} risks, "
+                                f"{counts['questions']} open questions (proposed — "
+                                "pending review)")})
+        except ExtractionError as exc:
+            log.append({"t": utcnow().isoformat(),
+                        "msg": f"Extraction failed: {exc}", "level": "error"})
 
 
 def _parse_dt(value) -> datetime | None:
@@ -269,19 +182,3 @@ def _parse_dt(value) -> datetime | None:
         return datetime.fromisoformat(str(value))
     except ValueError:
         return None
-
-
-def _deadline_to_date(deadline: str | None) -> datetime | None:
-    if not deadline:
-        return None
-    base = utcnow()
-    lowered = deadline.lower()
-    weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
-    if lowered in weekdays:
-        delta = (weekdays.index(lowered) - base.weekday()) % 7 or 7
-        return base + timedelta(days=delta)
-    if "next week" in lowered:
-        return base + timedelta(days=7)
-    if "month end" in lowered:
-        return (base.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    return base + timedelta(days=14)

@@ -49,9 +49,9 @@ from .models import (
     utcnow,
 )
 from .security.auth import hash_password
-from .services.connectors import extract_from_transcript
 from .services.feedback import submit_feedback
 from .services.ingestion import ingest_document
+from .services.transcripts import parse_transcript_file, turns_to_meta
 
 DEMO_PASSWORD = "brainchain-demo"
 
@@ -524,13 +524,17 @@ Morgan Reyes: Agreed to revisit at the deep-dive. Thanks everyone."""
         "Phoenix Program Review — July 10, 2026 (transcript)",
         transcript_j10, "transcript", "Internal", src_zoom, "Program Management",
         morgan, ORG, meta={"project": "Phoenix"}, days_ago=8)
-    extraction = extract_from_transcript(transcript_j10)
+    # Turns only — this meeting's decisions/tasks below are hand-authored,
+    # curated seed history (not run through persist_extraction), so the
+    # extraction dict just carries turn provenance for the meeting recap.
+    turns_j10 = parse_transcript_file("transcript.txt", transcript_j10)
     meeting_j10 = Meeting(
         org_id=org.id, title="Phoenix Program Review — July 10, 2026",
         held_at=now - timedelta(days=8), source="zoom",
         transcript_document_id=d_transcript.id,
         department_id=departments["Program Management"].id,
-        attendees=extraction["speakers"], extraction=extraction,
+        attendees=sorted({t.speaker for t in turns_j10}),
+        extraction={"turns": turns_to_meta(turns_j10)},
     )
     db.add(meeting_j10)
     db.flush()

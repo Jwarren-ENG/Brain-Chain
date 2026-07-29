@@ -131,3 +131,91 @@ def test_anthropic_extraction_retries_then_raises():
     with pytest.raises(ExtractionError):
         extract_meeting(MEETING_TURNS, provider=provider)
     assert len(fake.calls) == 2
+
+
+class _ExplodingClient:
+    def __init__(self):
+        self.messages = self
+
+    def create(self, **kwargs):
+        raise RuntimeError("connection reset")
+
+
+def test_anthropic_extraction_transport_failure_raises_extraction_error():
+    """A raw anthropic/network exception must never escape as-is — callers
+    downstream (import, connector sync, retry endpoint) catch only
+    ExtractionError, never a bare RuntimeError/anthropic exception."""
+    provider = AnthropicExtractionProvider("k", "m", client_factory=_ExplodingClient)
+    with pytest.raises(ExtractionError):
+        extract_meeting(MEETING_TURNS, provider=provider)
+
+
+def test_get_extraction_provider_respects_external_model_governance_gate(monkeypatch):
+    """Government deployments force external_models_allowed False even with an
+    API key configured — extraction must fall back to the mock provider."""
+    from app.config import Settings, get_settings
+    from app.services.meeting_extraction import MockExtractionProvider, get_extraction_provider
+
+    monkeypatch.setenv("BRAINCHAIN_ANTHROPIC_API_KEY", "k")
+    monkeypatch.setenv("BRAINCHAIN_DEPLOYMENT_PROFILE", "government")
+    get_settings.cache_clear()
+    try:
+        assert isinstance(get_extraction_provider(), MockExtractionProvider)
+    finally:
+        monkeypatch.delenv("BRAINCHAIN_ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("BRAINCHAIN_DEPLOYMENT_PROFILE", raising=False)
+        get_settings.cache_clear()
+
+
+def test_get_extraction_provider_uses_anthropic_when_allowed(monkeypatch):
+    from app.config import get_settings
+    from app.services.meeting_extraction import AnthropicExtractionProvider, get_extraction_provider
+
+    monkeypatch.setenv("BRAINCHAIN_ANTHROPIC_API_KEY", "k")
+    monkeypatch.setenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", "true")
+    monkeypatch.setenv("BRAINCHAIN_DEPLOYMENT_PROFILE", "commercial")
+    get_settings.cache_clear()
+    try:
+        assert isinstance(get_extraction_provider(), AnthropicExtractionProvider)
+    finally:
+        monkeypatch.delenv("BRAINCHAIN_ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", raising=False)
+        monkeypatch.delenv("BRAINCHAIN_DEPLOYMENT_PROFILE", raising=False)
+        get_settings.cache_clear()
+
+
+def test_persist_extraction_lands_proposed_artifacts():
+    from app.db import SessionLocal
+    from app.models import Decision, Document, Meeting, Task
+    from app.services.ingestion import ingest_document
+    from app.services.meeting_extraction import persist_extraction
+    from app.services.transcripts import turns_to_document_text, turns_to_meta
+
+    db = SessionLocal()
+    try:
+        org_id = db.query(Meeting).first().org_id
+        classification_id = db.query(Document).first().classification_id
+        doc = ingest_document(db, org_id=org_id, title="Transcript — test",
+                              content=turns_to_document_text(MEETING_TURNS),
+                              doc_type="transcript", classification_id=classification_id,
+                              acl=[("org", "*")])
+        meeting = Meeting(org_id=org_id, title="test import", source="upload",
+                          transcript_document_id=doc.id,
+                          attendees=["Maria Santos"],
+                          extraction={"turns": turns_to_meta(MEETING_TURNS)})
+        db.add(meeting)
+        db.flush()
+        extraction, dropped = extract_meeting(MEETING_TURNS)  # mock provider
+        counts = persist_extraction(db, meeting, doc, extraction, dropped)
+        assert counts["decisions"] >= 1 and counts["risks"] >= 1
+        d = db.query(Decision).filter(Decision.meeting_id == meeting.id).first()
+        assert d.status == "proposed"
+        assert d.details["turn_ids"]
+        assert d.sources == [doc.id]
+        t = db.query(Task).filter(Task.meeting_id == meeting.id).first()
+        assert t.status == "proposed"
+        assert meeting.extraction["risks"][0]["status"] == "proposed"
+        assert meeting.extraction["risks"][0]["rid"] == "r0"
+    finally:
+        db.rollback()
+        db.close()

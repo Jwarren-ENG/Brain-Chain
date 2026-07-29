@@ -58,8 +58,8 @@ Open **http://localhost:3000** and sign in. Every seeded account uses the passwo
    (verified / inference / conflict / missing / suggested action) and the evidence panel.
 2. **Meeting knowledge** — as *Sam*, open **Integrations** → Zoom → **Sync now**.
    The pending July 16 transcript is ingested; decisions, action items, owners,
-   deadlines, risks and open questions are extracted into **Tribal Knowledge**
-   (one upstream item is skipped with a permission error, on purpose).
+   due hints, risks and open questions are extracted as **proposed** knowledge
+   pending review (one upstream item is skipped with a permission error, on purpose).
 3. **Anonymous feedback** — the “Procurement bottlenecks” theme is seeded with **4**
    anonymous submissions — below the cohort of 5, so managers see it *suppressed*.
    Submit one more anonymous “process” feedback mentioning procurement as any employee,

@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DataSource, Department, Meeting, SecurityClassification, User, utcnow
+from ..models import DataSource, Department, Document, Meeting, SecurityClassification, User, utcnow
 from ..security import audit
 from ..security.auth import require_roles
+from ..security.permissions import can_read_document
 from ..serializers import meeting_dict
 from ..services.ingestion import ingest_document
 from ..services.transcripts import (
     TranscriptParseError,
+    Turn,
     parse_transcript_file,
     turns_to_document_text,
     turns_to_meta,
@@ -116,12 +118,67 @@ def import_meeting(
     )
     db.add(meeting)
     db.flush()
+
+    from ..services.meeting_extraction import ExtractionError, extract_meeting, persist_extraction
+
+    try:
+        extraction, dropped = extract_meeting(turns)
+        counts = persist_extraction(db, meeting, doc, extraction, dropped)
+        extraction_status = "completed"
+    except ExtractionError as exc:
+        counts = None
+        extraction_status = "failed"
+        meeting.extraction = {**meeting.extraction, "error": str(exc)[:500]}
+
     audit.record(db, user.org_id, "meeting.imported", actor_user_id=user.id,
                  target_type="meeting", target_id=meeting.id,
-                 meta={"turns": len(turns), "document_id": doc.id}, commit=True)
+                 meta={"turns": len(turns), "document_id": doc.id,
+                       "extraction_failed": extraction_status == "failed"}, commit=True)
     return {
         "meeting": meeting_dict(meeting),
         "document_id": doc.id,
         "turn_count": len(turns),
-        "extraction_status": "pending",  # Task 12 replaces this with real counts
+        "extraction_status": extraction_status,
+        "counts": counts,
     }
+
+
+@router.post("/meetings/{meeting_id}/extract")
+def retry_extraction(
+    meeting_id: str,
+    user: User = Depends(require_roles(*_IMPORT_ROLES)),
+    db: Session = Depends(get_db),
+):
+    """Re-run extraction after a failure. Refuses if artifacts already exist,
+    so a retry can never duplicate proposed knowledge.
+
+    Access check inlined here (Task 12): 404 unless the meeting exists in the
+    caller's org AND `can_read_document` passes on its transcript document —
+    same no-existence-oracle shape as `get_document`. Task 13 lifts this into
+    a shared `_reviewable_meeting` helper used by the review endpoints too.
+    """
+    from ..services.meeting_extraction import ExtractionError, extract_meeting, persist_extraction
+
+    meeting = db.get(Meeting, meeting_id)
+    doc = db.get(Document, meeting.transcript_document_id) if meeting and meeting.transcript_document_id else None
+    if not meeting or meeting.org_id != user.org_id or not doc or not can_read_document(db, user, doc):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Meeting not found")
+
+    ext = meeting.extraction or {}
+    if ext.get("decisions") or ext.get("actions") or ext.get("risks") or ext.get("questions"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Extraction already completed")
+    turns = [Turn(t["idx"], t["speaker"], t["text"], t.get("start"))
+             for t in ext.get("turns", [])]
+    if not turns:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "No stored turns to extract from")
+    try:
+        extraction, dropped = extract_meeting(turns)
+        counts = persist_extraction(db, meeting, doc, extraction, dropped)
+    except ExtractionError as exc:
+        meeting.extraction = {**ext, "error": str(exc)[:500]}
+        db.commit()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY,
+                            "Extraction failed again; transcript kept") from None
+    audit.record(db, user.org_id, "meeting.extraction.retried", actor_user_id=user.id,
+                 target_type="meeting", target_id=meeting.id, meta=counts, commit=True)
+    return {"extraction_status": "completed", "counts": counts}

@@ -125,6 +125,24 @@ def test_unknown_department_id_is_404_and_persists_nothing(client, auth):
     assert len(after) == len(before)
 
 
+def test_import_runs_extraction_and_reports_counts(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    resp = _import(client, headers, classification_id=cid)
+    body = resp.json()
+    assert body["extraction_status"] == "completed"
+    assert body["counts"]["decisions"] >= 1  # "We decided to switch..." in VTT
+
+
+def test_extraction_retry_endpoint_reruns_only_when_no_artifacts(client, auth):
+    headers = auth("morgan")
+    cid = _internal_classification(client, headers)
+    mid = _import(client, headers, classification_id=cid).json()["meeting"]["id"]
+    # Artifacts already exist → retry refuses rather than duplicating them.
+    resp = client.post(f"/api/meetings/{mid}/extract", headers=headers)
+    assert resp.status_code == 409
+
+
 def test_import_records_audit_event(client, auth):
     headers = auth("morgan")
     cid = _internal_classification(client, headers)
