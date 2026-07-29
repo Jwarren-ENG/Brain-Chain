@@ -53,14 +53,36 @@ def test_get_embedding_provider_selects_voyage(monkeypatch):
     emb.reset_embedding_provider()
     monkeypatch.setenv("BRAINCHAIN_EMBEDDINGS_PROVIDER", "voyage")
     monkeypatch.setenv("BRAINCHAIN_VOYAGE_API_KEY", "k")
+    monkeypatch.setenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", "true")
     from app.config import get_settings
     get_settings.cache_clear()
     assert isinstance(emb.get_embedding_provider(), emb.VoyageEmbeddings)
     # cleanup so other tests keep the local provider
     monkeypatch.delenv("BRAINCHAIN_EMBEDDINGS_PROVIDER")
     monkeypatch.delenv("BRAINCHAIN_VOYAGE_API_KEY")
+    monkeypatch.delenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS")
     get_settings.cache_clear()
     emb.reset_embedding_provider()
+
+
+def test_get_embedding_provider_respects_external_model_governance_gate(monkeypatch):
+    """Government deployments force external_models_allowed False even with
+    voyage selected and an API key configured — embeddings must fall back to
+    the local hashed provider, matching the answer/extraction gate behavior."""
+    emb.reset_embedding_provider()
+    monkeypatch.setenv("BRAINCHAIN_EMBEDDINGS_PROVIDER", "voyage")
+    monkeypatch.setenv("BRAINCHAIN_VOYAGE_API_KEY", "k")
+    monkeypatch.setenv("BRAINCHAIN_DEPLOYMENT_PROFILE", "government")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    try:
+        assert isinstance(emb.get_embedding_provider(), emb.LocalHashedEmbeddings)
+    finally:
+        monkeypatch.delenv("BRAINCHAIN_EMBEDDINGS_PROVIDER")
+        monkeypatch.delenv("BRAINCHAIN_VOYAGE_API_KEY")
+        monkeypatch.delenv("BRAINCHAIN_DEPLOYMENT_PROFILE")
+        get_settings.cache_clear()
+        emb.reset_embedding_provider()
 
 
 def test_voyage_without_key_falls_back_to_local(monkeypatch):

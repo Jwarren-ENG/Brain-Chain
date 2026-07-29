@@ -13,6 +13,7 @@ from ..models import (
     Department,
     Document,
     Meeting,
+    Organization,
     SecurityClassification,
     Task,
     User,
@@ -133,8 +134,9 @@ def import_meeting(
 
     from ..services.meeting_extraction import ExtractionError, extract_meeting, persist_extraction
 
+    org = db.get(Organization, user.org_id)
     try:
-        extraction, dropped = extract_meeting(turns)
+        extraction, dropped = extract_meeting(turns, org_settings=org.settings if org else None)
         counts = persist_extraction(db, meeting, doc, extraction, dropped)
         extraction_status = "completed"
     except ExtractionError as exc:
@@ -198,8 +200,9 @@ def retry_extraction(
              for t in ext.get("turns", [])]
     if not turns:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "No stored turns to extract from")
+    org = db.get(Organization, user.org_id)
     try:
-        extraction, dropped = extract_meeting(turns)
+        extraction, dropped = extract_meeting(turns, org_settings=org.settings if org else None)
         counts = persist_extraction(db, meeting, doc, extraction, dropped)
     except ExtractionError as exc:
         meeting.extraction = {**ext, "error": str(exc)[:500]}

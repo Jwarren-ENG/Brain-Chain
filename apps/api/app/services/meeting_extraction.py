@@ -211,23 +211,31 @@ class AnthropicExtractionProvider:
         raise ExtractionError(f"Model returned invalid extraction twice: {last_error}")
 
 
-def get_extraction_provider(provider=None):
+def get_extraction_provider(provider=None, *, org_settings: dict | None = None):
+    """Select the extraction provider. Anthropic requires BOTH governance gates:
+    the deployment-level `settings.external_models_allowed` (env/profile, e.g.
+    government forces this False) AND the org-level admin toggle
+    `external_models_enabled` — the same two gates `llm_gateway.resolve_provider`
+    enforces for answers. No `org_settings` means the org gate is treated as
+    closed, so callers that omit it (or pass org=None) always get the mock
+    provider even with a valid API key and a permissive deployment profile."""
     if provider is not None:
         return provider
     from ..config import get_settings
 
     settings = get_settings()
-    if settings.anthropic_api_key and settings.external_models_allowed:
+    org_allows_external = bool((org_settings or {}).get("external_models_enabled", False))
+    if settings.anthropic_api_key and settings.external_models_allowed and org_allows_external:
         return AnthropicExtractionProvider(settings.anthropic_api_key,
                                            settings.anthropic_model)
     return MockExtractionProvider()
 
 
 def extract_meeting(
-    turns: list[Turn], *, provider=None
+    turns: list[Turn], *, provider=None, org_settings: dict | None = None
 ) -> tuple[MeetingExtraction, list[str]]:
     """Run extraction with the active provider and enforce the turn-ref invariant."""
-    extraction = get_extraction_provider(provider).extract(turns)
+    extraction = get_extraction_provider(provider, org_settings=org_settings).extract(turns)
     return validate_against_turns(extraction, turns)
 
 

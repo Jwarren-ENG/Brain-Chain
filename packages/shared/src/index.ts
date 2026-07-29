@@ -299,9 +299,17 @@ export interface MeetingInfo {
   attendees: string[];
   extraction: {
     decisions?: { text: string; speaker: string }[];
+    // `action_items` / `open_questions` are the hand-authored seed shape
+    // (list-view summary of `{text,...}` pairs). `actions` / `questions` are
+    // what `persist_extraction` actually writes for imported and
+    // connector-synced meetings (apps/api/app/services/meeting_extraction.py)
+    // — both must be read when deriving counts, since a given meeting's
+    // extraction blob only ever has one pair populated.
     action_items?: { text: string; owner: string; deadline: string | null }[];
+    actions?: { task_id: string; turn_ids: number[]; owner_name: string; due_hint: string }[];
     risks?: { text: string; speaker: string }[];
     open_questions?: { text: string; speaker: string }[];
+    questions?: { qid: string; text: string; raised_by: string; status: string; turn_ids: number[] }[];
     speakers?: string[];
   };
   transcript_document_id: string | null;

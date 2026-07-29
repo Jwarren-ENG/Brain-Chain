@@ -22,6 +22,7 @@ from ..models import (
     Connector,
     DataSource,
     Meeting,
+    Organization,
     SourceItem,
     SyncJob,
     User,
@@ -171,8 +172,9 @@ def _ingest_item(db: Session, connector: Connector, item: dict, log: list[dict])
         )
         db.add(meeting)
         db.flush()
+        org = db.get(Organization, connector.org_id)
         try:
-            extraction, dropped = extract_meeting(turns)
+            extraction, dropped = extract_meeting(turns, org_settings=org.settings if org else None)
             counts = persist_extraction(db, meeting, doc, extraction, dropped)
             log.append({"t": utcnow().isoformat(),
                         "msg": (f"Transcript processed: {counts['decisions']} decisions, "

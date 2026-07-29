@@ -166,9 +166,9 @@ export function MeetingCard({
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <ExtractStat icon={<Landmark className="size-3.5" />} label="Decisions" value={extraction.decisions?.length ?? 0} />
-        <ExtractStat icon={<ListChecks className="size-3.5" />} label="Actions" value={extraction.action_items?.length ?? 0} />
+        <ExtractStat icon={<ListChecks className="size-3.5" />} label="Actions" value={(extraction.actions ?? extraction.action_items)?.length ?? 0} />
         <ExtractStat icon={<TriangleAlert className="size-3.5" />} label="Risks" value={extraction.risks?.length ?? 0} warn />
-        <ExtractStat icon={<CircleHelp className="size-3.5" />} label="Questions" value={extraction.open_questions?.length ?? 0} />
+        <ExtractStat icon={<CircleHelp className="size-3.5" />} label="Questions" value={(extraction.questions ?? extraction.open_questions)?.length ?? 0} />
       </div>
     </Card>
   );

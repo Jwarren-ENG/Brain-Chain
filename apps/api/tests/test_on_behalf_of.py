@@ -35,6 +35,20 @@ def test_rejected_with_wrong_token(client, service_env):
     assert resp.status_code == 401
 
 
+def test_rejected_with_non_ascii_token_does_not_500(client, service_env):
+    # hmac.compare_digest raises TypeError on plain str with non-ASCII content
+    # unless both sides are encoded first; a bad/garbled header must 401, not 500.
+    # Headers are transported as Latin-1/obs-text bytes over the wire (RFC 7230),
+    # so encode to bytes here to bypass httpx's client-side ASCII-only str check
+    # and exercise the same non-ASCII str FastAPI would hand the route.
+    resp = client.post(
+        "/api/ask/on-behalf-of",
+        json={"email": "avery.chen@heliosaerodyne.com", "query": "hello there"},
+        headers={"X-Service-Token": "wrøng-tökén".encode("latin-1")},
+    )
+    assert resp.status_code == 401
+
+
 def test_unknown_email_is_404(client, service_env):
     resp = _ask(client, "nobody@heliosaerodyne.com", "hello there")
     assert resp.status_code == 404

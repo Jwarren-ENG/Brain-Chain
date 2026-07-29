@@ -168,6 +168,8 @@ def test_get_extraction_provider_respects_external_model_governance_gate(monkeyp
 
 
 def test_get_extraction_provider_uses_anthropic_when_allowed(monkeypatch):
+    """Both governance gates must be open: deployment-level (env/profile) AND
+    the org-level external_models_enabled admin toggle."""
     from app.config import get_settings
     from app.services.meeting_extraction import AnthropicExtractionProvider, get_extraction_provider
 
@@ -176,7 +178,36 @@ def test_get_extraction_provider_uses_anthropic_when_allowed(monkeypatch):
     monkeypatch.setenv("BRAINCHAIN_DEPLOYMENT_PROFILE", "commercial")
     get_settings.cache_clear()
     try:
-        assert isinstance(get_extraction_provider(), AnthropicExtractionProvider)
+        assert isinstance(
+            get_extraction_provider(org_settings={"external_models_enabled": True}),
+            AnthropicExtractionProvider,
+        )
+    finally:
+        monkeypatch.delenv("BRAINCHAIN_ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", raising=False)
+        monkeypatch.delenv("BRAINCHAIN_DEPLOYMENT_PROFILE", raising=False)
+        get_settings.cache_clear()
+
+
+def test_get_extraction_provider_requires_org_gate_even_when_env_allows(monkeypatch):
+    """Env/profile fully allow external calls and an API key is set, but the
+    org admin setting external_models_enabled is False (or org is omitted) —
+    extraction must still fall back to the mock provider."""
+    from app.config import get_settings
+    from app.services.meeting_extraction import MockExtractionProvider, get_extraction_provider
+
+    monkeypatch.setenv("BRAINCHAIN_ANTHROPIC_API_KEY", "k")
+    monkeypatch.setenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", "true")
+    monkeypatch.setenv("BRAINCHAIN_DEPLOYMENT_PROFILE", "commercial")
+    get_settings.cache_clear()
+    try:
+        # org omitted entirely
+        assert isinstance(get_extraction_provider(), MockExtractionProvider)
+        # org explicitly disables external models
+        assert isinstance(
+            get_extraction_provider(org_settings={"external_models_enabled": False}),
+            MockExtractionProvider,
+        )
     finally:
         monkeypatch.delenv("BRAINCHAIN_ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("BRAINCHAIN_ALLOW_EXTERNAL_MODEL_CALLS", raising=False)

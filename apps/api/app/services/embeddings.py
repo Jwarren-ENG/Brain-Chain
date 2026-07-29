@@ -98,7 +98,11 @@ def get_embedding_provider() -> EmbeddingProvider:
         from ..config import get_settings
 
         settings = get_settings()
-        if settings.embeddings_provider == "voyage" and settings.voyage_api_key:
+        if (
+            settings.embeddings_provider == "voyage"
+            and settings.voyage_api_key
+            and settings.external_models_allowed
+        ):
             _provider = VoyageEmbeddings(settings.voyage_api_key, settings.voyage_model)
         else:
             _provider = LocalHashedEmbeddings()

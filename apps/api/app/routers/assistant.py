@@ -55,7 +55,7 @@ def ask_on_behalf_of(
     endpoint can never widen access beyond what that user sees in the web app."""
     settings = get_settings()
     if not settings.slack_service_token or not x_service_token or not hmac.compare_digest(
-        x_service_token, settings.slack_service_token
+        x_service_token.encode("utf-8"), settings.slack_service_token.encode("utf-8")
     ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid service token")
     if body.mode not in MODES:

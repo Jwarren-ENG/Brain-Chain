@@ -29,7 +29,9 @@ def _turns(name):
 def test_design_review_extraction_quality():
     from app.services.meeting_extraction import extract_meeting
 
-    extraction, dropped = extract_meeting(_turns("design_review.vtt"))
+    extraction, dropped = extract_meeting(
+        _turns("design_review.vtt"), org_settings={"external_models_enabled": True}
+    )
     # Goldens are behavioral minimums, not exact matches.
     assert len(extraction.decisions) >= 1
     bracket = [d for d in extraction.decisions if "7075" in d.statement or "bracket" in d.statement.lower()]
@@ -45,6 +47,8 @@ def test_design_review_extraction_quality():
 def test_supplier_call_extraction_quality():
     from app.services.meeting_extraction import extract_meeting
 
-    extraction, _ = extract_meeting(_turns("supplier_call.txt"))
+    extraction, _ = extract_meeting(
+        _turns("supplier_call.txt"), org_settings={"external_models_enabled": True}
+    )
     assert extraction.decisions or extraction.risks
     assert all(d.turn_ids for d in extraction.decisions)
