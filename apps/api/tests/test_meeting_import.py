@@ -34,6 +34,10 @@ def _internal_classification(client, headers):
     return _classification_at_level(client, headers, 1)
 
 
+def _restricted_classification(client, headers):
+    return _classification_at_level(client, headers, 3)
+
+
 def test_employee_cannot_import(client, auth):
     resp = _import(client, auth("avery"), classification_id="anything")
     assert resp.status_code == 403

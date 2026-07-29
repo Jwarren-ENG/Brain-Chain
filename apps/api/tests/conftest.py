@@ -45,6 +45,7 @@ def tokens(client):
         "leo": login("leo.martins@heliosaerodyne.com"),
         "priya": login("priya.raman@heliosaerodyne.com"),
         "noah": login("noah.fields@heliosaerodyne.com"),
+        "lena": login("lena.hart@heliosaerodyne.com"),
     }
 
 

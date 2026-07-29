@@ -5,9 +5,19 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import DataSource, Department, Document, Meeting, SecurityClassification, User, utcnow
+from ..models import (
+    DataSource,
+    Decision,
+    Department,
+    Document,
+    Meeting,
+    SecurityClassification,
+    Task,
+    User,
+    utcnow,
+)
 from ..security import audit
-from ..security.auth import require_roles
+from ..security.auth import get_current_user, require_roles
 from ..security.permissions import can_read_document
 from ..serializers import meeting_dict
 from ..services.ingestion import ingest_document
@@ -143,6 +153,29 @@ def import_meeting(
     }
 
 
+def _reviewable_meeting(meeting_id: str, user: User, db: Session) -> Meeting:
+    """404 unless the meeting exists in the caller's org AND `can_read_document`
+    passes on its transcript document — same no-existence-oracle shape as
+    `get_document`. Shared by the retry-extraction and review endpoints."""
+    meeting = db.get(Meeting, meeting_id)
+    if not meeting or meeting.org_id != user.org_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Meeting not found")
+    doc = db.get(Document, meeting.transcript_document_id) if meeting.transcript_document_id else None
+    if not doc or not can_read_document(db, user, doc):
+        # Same response as missing: no existence oracle.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Meeting not found")
+    return meeting
+
+
+def _turns_by_idx(meeting: Meeting) -> dict[int, dict]:
+    return {t["idx"]: t for t in (meeting.extraction or {}).get("turns", [])}
+
+
+def _resolve_turns(turn_ids, turns_map: dict[int, dict]) -> list[dict]:
+    return [{"idx": i, "speaker": turns_map[i]["speaker"], "text": turns_map[i]["text"]}
+            for i in turn_ids if i in turns_map]
+
+
 @router.post("/meetings/{meeting_id}/extract")
 def retry_extraction(
     meeting_id: str,
@@ -150,19 +183,11 @@ def retry_extraction(
     db: Session = Depends(get_db),
 ):
     """Re-run extraction after a failure. Refuses if artifacts already exist,
-    so a retry can never duplicate proposed knowledge.
-
-    Access check inlined here (Task 12): 404 unless the meeting exists in the
-    caller's org AND `can_read_document` passes on its transcript document —
-    same no-existence-oracle shape as `get_document`. Task 13 lifts this into
-    a shared `_reviewable_meeting` helper used by the review endpoints too.
-    """
+    so a retry can never duplicate proposed knowledge."""
     from ..services.meeting_extraction import ExtractionError, extract_meeting, persist_extraction
 
-    meeting = db.get(Meeting, meeting_id)
-    doc = db.get(Document, meeting.transcript_document_id) if meeting and meeting.transcript_document_id else None
-    if not meeting or meeting.org_id != user.org_id or not doc or not can_read_document(db, user, doc):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Meeting not found")
+    meeting = _reviewable_meeting(meeting_id, user, db)
+    doc = db.get(Document, meeting.transcript_document_id)
 
     ext = meeting.extraction or {}
     if ext.get("decisions") or ext.get("actions") or ext.get("risks") or ext.get("questions"):
@@ -182,3 +207,46 @@ def retry_extraction(
     audit.record(db, user.org_id, "meeting.extraction.retried", actor_user_id=user.id,
                  target_type="meeting", target_id=meeting.id, meta=counts, commit=True)
     return {"extraction_status": "completed", "counts": counts}
+
+
+@router.get("/meetings/{meeting_id}/review")
+def meeting_review(meeting_id: str, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    meeting = _reviewable_meeting(meeting_id, user, db)
+    ext = meeting.extraction or {}
+    turns_map = _turns_by_idx(meeting)
+
+    decisions = []
+    for ref in ext.get("decisions", []):
+        row = db.get(Decision, ref["id"])
+        if not row:
+            continue
+        decisions.append({
+            "id": row.id, "title": row.title, "rationale": row.rationale,
+            "alternatives": (row.details or {}).get("alternatives", []),
+            "decided_by": (row.details or {}).get("decided_by", ""),
+            "status": row.status,
+            "turns": _resolve_turns(ref.get("turn_ids", []), turns_map),
+        })
+    actions = []
+    for ref in ext.get("actions", []):
+        row = db.get(Task, ref["task_id"])
+        if not row:
+            continue
+        actions.append({
+            "task_id": row.id, "title": row.title,
+            "owner_name": ref.get("owner_name", ""), "due_hint": ref.get("due_hint", ""),
+            "status": row.status,
+            "turns": _resolve_turns(ref.get("turn_ids", []), turns_map),
+        })
+    return {
+        "meeting": meeting_dict(meeting),
+        "summary": ext.get("summary", ""),
+        "decisions": decisions,
+        "actions": actions,
+        "risks": [{**r, "turns": _resolve_turns(r.get("turn_ids", []), turns_map)}
+                  for r in ext.get("risks", [])],
+        "questions": [{**q, "turns": _resolve_turns(q.get("turn_ids", []), turns_map)}
+                      for q in ext.get("questions", [])],
+        "dropped": ext.get("dropped", []),
+    }
