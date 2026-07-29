@@ -1,7 +1,8 @@
 "use client";
 
+import { ContributeMenu } from "@/components/contribute-menu";
 import { useSession } from "@/components/providers";
-import { Button, CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
+import { CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
 import { api, apiUpload } from "@/lib/api";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { Classification, MeetingImportResponse, MeetingInfo } from "@brainchain/shared";
@@ -13,14 +14,12 @@ import {
   Landmark,
   ListChecks,
   MessageCircleMore,
-  Upload,
   TriangleAlert,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { ImportTranscriptDialog } from "./import-dialog";
 import { MeetingCard } from "./meeting-card";
 
 export default function MeetingsPage() {
@@ -29,7 +28,6 @@ export default function MeetingsPage() {
   const queryClient = useQueryClient();
   const [openMeeting, setOpenMeeting] = React.useState<MeetingInfo | null>(null);
   const [reflectionOpen, setReflectionOpen] = React.useState<MeetingInfo | null>(null);
-  const [importOpen, setImportOpen] = React.useState(false);
 
   const canImport = hasRole(user, "manager", "data_steward", "system_admin");
 
@@ -59,11 +57,12 @@ export default function MeetingsPage() {
           <p className="mt-1 text-sm text-ink-3">Recaps, decisions, and follow-through from every captured meeting.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canImport && (
-            <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
-              <Upload className="size-3.5" /> Import transcript
-            </Button>
-          )}
+          <ContributeMenu
+            user={user}
+            classifications={classifications?.items ?? []}
+            onImported={handleImported}
+            importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+          />
         </div>
       </header>
 
@@ -113,16 +112,6 @@ export default function MeetingsPage() {
       <Dialog open={!!openMeeting} onClose={() => setOpenMeeting(null)} title={openMeeting?.title ?? "Meeting recap"} wide>
         {openMeeting && <MeetingRecap meeting={openMeeting} />}
       </Dialog>
-
-      {canImport && (
-        <ImportTranscriptDialog
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          classifications={classifications?.items ?? []}
-          onImported={handleImported}
-          importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
-        />
-      )}
     </div>
   );
 }

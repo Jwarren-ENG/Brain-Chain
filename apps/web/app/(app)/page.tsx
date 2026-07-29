@@ -1,14 +1,16 @@
 "use client";
 
+import { ContributeMenu } from "@/components/contribute-menu";
 import { useSession } from "@/components/providers";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, apiUpload } from "@/lib/api";
 import { ASSISTANT_NAME } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
-import type { DecisionInfo, HomeData, MeetingInfo } from "@brainchain/shared";
-import { useQuery } from "@tanstack/react-query";
+import type { Classification, DecisionInfo, HomeData, MeetingImportResponse, MeetingInfo } from "@brainchain/shared";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { AskBox } from "./ask-box";
 
@@ -21,7 +23,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export default function LandingPage() {
   const { user } = useSession();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const isManager = hasRole(user, "manager", "executive");
+  const canImport = hasRole(user, "manager", "data_steward", "system_admin");
 
   const { data: home, isError, isLoading, refetch } = useQuery({
     queryKey: ["home"],
@@ -36,6 +41,16 @@ export default function LandingPage() {
     queryFn: () => api<{ items: DecisionInfo[] }>("/decisions"),
     enabled: isManager,
   });
+  const { data: classifications } = useQuery({
+    queryKey: ["gov-classifications"],
+    queryFn: () => api<{ items: Classification[] }>("/governance/classifications"),
+    enabled: canImport,
+  });
+
+  function handleImported(result: MeetingImportResponse) {
+    queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    router.push(`/meetings/${result.meeting.id}/review`);
+  }
 
   const recentMeetings = [...(meetings?.items ?? [])]
     .sort((a, b) => new Date(b.held_at ?? 0).getTime() - new Date(a.held_at ?? 0).getTime())
@@ -106,13 +121,14 @@ export default function LandingPage() {
             <p className="mt-2 text-[12.5px] leading-relaxed text-ink-3">
               Import a transcript, share a reflection, or capture something only you know.
             </p>
-            {/* Interim: Task 5 replaces this with the ContributeMenu. */}
-            <Link
-              href="/meetings"
-              className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-btn px-3.5 text-[13px] font-semibold text-btn-ink hover:opacity-90"
-            >
-              + Contribute
-            </Link>
+            <div className="mt-3">
+              <ContributeMenu
+                user={user}
+                classifications={classifications?.items ?? []}
+                onImported={handleImported}
+                importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+              />
+            </div>
           </section>
         </div>
       )}
