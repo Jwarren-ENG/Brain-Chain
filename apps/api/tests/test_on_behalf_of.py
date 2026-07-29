@@ -62,3 +62,25 @@ def test_permissions_enforced_for_mapped_user(client, service_env):
     high_text = str(high["message"])
     assert RESTRICTED_MARKER not in low_text
     assert RESTRICTED_MARKER in high_text
+
+
+def test_audit_event_correlates_to_conversation_without_leaking_query(client, auth, service_env):
+    query = "What are the main risks affecting the Phoenix project?"
+    resp = _ask(client, "avery.chen@heliosaerodyne.com", query)
+    assert resp.status_code == 200
+    body = resp.json()
+
+    audit_resp = client.get(
+        "/api/audit",
+        params={"action": "assistant.ask_on_behalf_of"},
+        headers=auth("riley"),
+    )
+    assert audit_resp.status_code == 200
+    items = audit_resp.json()["items"]
+    assert items, "expected an assistant.ask_on_behalf_of audit event"
+
+    event = items[0]
+    assert event["actor_type"] == "service"
+    assert event["meta"]["conversation_id"] == body["conversation_id"]
+    assert event["meta"]["message_id"] == body["message"]["id"]
+    assert query not in str(event["meta"])

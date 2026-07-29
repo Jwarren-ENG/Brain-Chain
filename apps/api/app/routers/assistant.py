@@ -70,7 +70,11 @@ def ask_on_behalf_of(
     conversation, _user_msg, assistant_msg = ask_service(db, user, body.query, mode=body.mode)
     audit.record(db, user.org_id, "assistant.ask_on_behalf_of", actor_type="service",
                  target_type="user", target_id=user.id,
-                 meta={"channel": "slack"}, commit=True)
+                 meta={
+                     "channel": "slack",
+                     "conversation_id": conversation.id,
+                     "message_id": assistant_msg.id,
+                 }, commit=True)
     return {
         "user_id": user.id,
         "user_name": user.name,
