@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { MeetingCard } from "./meeting-card";
+import { InvitePanel } from "./invite-panel";
 
 export default function MeetingsPage() {
   const { user } = useSession();
@@ -65,6 +66,17 @@ export default function MeetingsPage() {
           />
         </div>
       </header>
+
+      <InvitePanel
+        importSlot={
+          <ContributeMenu
+            user={user}
+            classifications={classifications?.items ?? []}
+            onImported={handleImported}
+            importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+          />
+        }
+      />
 
       {isError ? (
         <ErrorState message="Couldn't load meetings. The API may be down." onRetry={() => refetch()} />
