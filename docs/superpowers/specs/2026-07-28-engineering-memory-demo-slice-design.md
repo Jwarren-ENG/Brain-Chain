@@ -1,4 +1,4 @@
-# Engineering Memory Demo Slice — Design
+# Company Memory — Demo Slice Design
 
 **Date:** 2026-07-28
 **Status:** Draft for review
@@ -6,6 +6,25 @@
 **Scope authority:** The AI-staff operating plan, "Weeks 3–6: build only" — transcript upload, meeting summary, decision & rationale extraction, human approval of memories, search over approved memories, answers with source citations, basic Slack interface.
 
 ---
+
+## 0. North Star
+
+> **Every important decision your company makes should become institutional memory instead of disappearing forever.**
+
+This product is not a meeting assistant, a Slack bot, enterprise search, or another RAG system. It is the company's memory. Transcript upload, extraction, approval, retrieval, and citations are mechanisms for one loop:
+
+```
+Knowledge happens → AI captures it → a human verifies it →
+it becomes company memory → anyone authorized can retrieve it →
+future work improves because history isn't lost
+```
+
+Meetings are simply the *first knowledge source* — the richest and least-captured one. The enduring product is the memory layer that every future source (Jira, docs, code review, email), every employee, and every future AI agent reads from and writes to. This slice is the smallest end-to-end version of that loop that a skeptical engineering audience can poke at live.
+
+Two philosophical commitments this slice makes concrete:
+
+1. **The AI is not allowed to invent company truth.** Only human-approved knowledge enters the answering context (proposed artifacts are excluded from `/ask`). The AI proposes; people ratify; the memory is what was ratified.
+2. **There is no monolithic "AI" in the architecture.** There are four separable systems — **Capture → Understand → Approve → Retrieve** — each independently testable and swappable. That separation is what makes enterprise trust tractable.
 
 ## 1. Context
 
@@ -33,6 +52,15 @@ Every step runs live against the real model. Nothing in the demo path is scripte
 - **C. Polished scripted demo.** Keep the mocks, add surfaces, script the story. Fastest, but shatters under one off-script question from a technical audience, and moves nothing toward a pilot. Rejected.
 
 ## 4. Architecture
+
+Conceptually, four systems, deliberately separated:
+
+| System | Role | Components in this slice |
+|---|---|---|
+| **Capture** | Get raw knowledge in, with provenance | Transcript import (§5.3) |
+| **Understand** | Turn raw material into proposed knowledge objects | LLM extraction (§5.4), embeddings (§5.2) |
+| **Approve** | Humans ratify what becomes company truth | Review queue (§5.5) |
+| **Retrieve** | Permission-aware answers from approved memory only | `/ask`, Slack (§5.1, §5.6) |
 
 No new services beyond one small Slack app. The monorepo gains:
 
@@ -91,6 +119,7 @@ The permission pre-filter stays exactly where it is: ACL intersection happens be
   - **Summary** — short meeting recap
 - Invariant carried over from the interview engine: *no artifact without source-turn references.* Artifacts whose turn refs don't resolve are dropped and logged, never silently kept.
 - Long transcripts are chunked by turns with overlap; extraction runs per chunk and results are merged/deduped by the model in a second pass only if needed (demo transcripts fit one call).
+- **Knowledge-object contract.** Decisions, action items, risks, and open questions are all *kinds of knowledge object*, and every one must be able to answer four questions: **what happened** (the statement), **why** (rationale/context), **who approved it** (the confirming user, once ratified), and **what evidence supports it** (source-turn refs, and later document/ticket refs). The existing typed tables already carry these fields — no schema refactor is needed for this slice — but the extraction schema is written so that a future source (Jira ticket, document, code review, supplier email) emits the *same object shapes*. The ingestion source is a detail; the objects are the product.
 - Everything lands as `status="proposed"`. The regex extractor is deleted for meetings (the connector-transcript path routes through this service); interview extraction is untouched in this slice.
 - Runs synchronously in the import request for the demo (target < ~60s); the response streams status so the UI can show progress. A background queue is explicitly deferred.
 
@@ -141,6 +170,8 @@ The permission pre-filter stays exactly where it is: ACL intersection happens be
 ## 8. Out of scope (deliberately)
 
 Live meeting bot / real-time joining; voice and ASR; SSO/SCIM/MFA; Postgres/pgvector migration; real connectors (Zoom/Jira/Drive OAuth); Microsoft Teams; background job queue; expert discovery; onboarding paths; hiring/interview features beyond the existing engine; autonomous agent actions; multi-tenant admin; cross-member permission intersection for Slack channels; email ingestion; CAD/PLM anything. Each returns only after the core loop is trusted (per the operating plan's "Later" list).
+
+Also deferred by explicit decision (not oversight): a **generic knowledge-object schema / unified knowledge graph refactor**. The four-question contract (§5.4) is enforced now at the extraction layer over the existing typed tables; collapsing those tables into one generic object model — and adding non-meeting sources that emit the same shapes — is the ~6-month platform expansion, sequenced after the demo proves the loop. The roadmap arc: today, meetings → memory → Slack; next, more sources (docs, Jira, code) feeding one memory graph; eventually, every application and agent reading from a single approved memory layer.
 
 ## 9. Security notes for this slice
 
