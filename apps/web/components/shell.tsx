@@ -183,10 +183,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col md:pl-[236px]">
         <header className="flex h-12 flex-none items-center justify-end gap-3 px-5 md:px-10">
-          <span className="mr-auto inline-flex items-center gap-2 text-xs text-ink-3 md:mr-0">
-            <span className="size-1.5 rounded-full bg-[#3fb27f]" aria-hidden />
-            Company brain up to date
-          </span>
           <button
             onClick={() => setPaletteOpen(true)}
             aria-label="Search (Command K)"
