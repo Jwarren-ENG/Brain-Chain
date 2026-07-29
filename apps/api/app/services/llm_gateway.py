@@ -554,6 +554,17 @@ class AnthropicProvider:
 # ------------------------------------------------------------ policy routing
 
 
+def _external_client(settings) -> "ModelProviderClient | None":
+    """Choose the configured external adapter; Anthropic preferred."""
+    if settings.anthropic_api_key:
+        return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model)
+    if settings.openai_base_url and settings.openai_api_key and settings.openai_model:
+        return OpenAICompatibleProvider(
+            settings.openai_base_url, settings.openai_api_key, settings.openai_model
+        )
+    return None
+
+
 class PolicyViolation(Exception):
     pass
 
@@ -595,20 +606,15 @@ def resolve_provider(
         if provider.is_external:
             if not external_ok:
                 notes.append(
-                    f"Policy “{policy.name}” skipped: external model calls are disabled for "
-                    f"the {org.deployment_profile} deployment profile."
+                    f'Policy “{policy.name}” skipped: external model calls are disabled for '
+                    f'the {org.deployment_profile} deployment profile.'
                 )
                 continue
-            if not (settings.openai_base_url and settings.openai_api_key and settings.openai_model):
-                notes.append(f"Policy “{policy.name}” skipped: external provider not configured.")
+            client = _external_client(settings)
+            if client is None:
+                notes.append(f'Policy “{policy.name}” skipped: external provider not configured.')
                 continue
-            return (
-                OpenAICompatibleProvider(
-                    settings.openai_base_url, settings.openai_api_key, settings.openai_model
-                ),
-                provider,
-                notes,
-            )
+            return client, provider, notes
         return MockProvider(), provider, notes
 
     notes.append("No policy matched; using the built-in local provider.")

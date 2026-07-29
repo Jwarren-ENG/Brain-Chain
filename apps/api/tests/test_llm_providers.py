@@ -111,3 +111,30 @@ def test_anthropic_api_failure_degrades_to_typed_unavailable_answer():
     assert [s.type for s in answer.segments] == ["missing"]
     assert "unavailable" in answer.content.lower()
     assert "system issue" in answer.content.lower()  # not mistaken for absent evidence
+
+
+# -------------------------------------------- provider selection tests
+
+
+from app.services.llm_gateway import (
+    MockProvider,
+    OpenAICompatibleProvider,
+    _external_client,
+)
+
+
+def test_external_client_prefers_anthropic():
+    s = Settings(_env_file=None, anthropic_api_key="k",
+                 openai_base_url="https://x", openai_api_key="k2", openai_model="m")
+    client = _external_client(s)
+    assert isinstance(client, AnthropicProvider)
+
+
+def test_external_client_falls_back_to_openai_compatible():
+    s = Settings(_env_file=None, openai_base_url="https://x",
+                 openai_api_key="k2", openai_model="m")
+    assert isinstance(_external_client(s), OpenAICompatibleProvider)
+
+
+def test_external_client_none_when_unconfigured():
+    assert _external_client(Settings(_env_file=None)) is None
