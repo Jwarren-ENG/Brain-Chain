@@ -4,9 +4,19 @@ import { api, setStoredUser, setToken } from "@/lib/api";
 import { ASSISTANT_NAME } from "@/lib/brand";
 import { cn, hasRole } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { FileSearch, LogOut, Moon, Search, Settings, Sparkles, Sun } from "lucide-react";
+import {
+  FileSearch,
+  LogOut,
+  MessageSquare,
+  Moon,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Sun,
+} from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useSession, useTheme } from "./providers";
 import { Badge } from "./ui";
@@ -18,9 +28,15 @@ interface NavItem {
   badgeKey?: "work";
 }
 
-/** The collapsed sidebar: exactly Home, Meetings, My work. No sections, no role gating. */
+interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+/** The pinned sidebar nav: Meetings, My work. Home lives in the logo + "+ New
+ * chat" affordances above the conversation history, not as a NAV_ITEMS entry. */
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Home" },
   { href: "/meetings", label: "Meetings" },
   { href: "/approvals", label: "My work", badgeKey: "work" },
 ];
@@ -41,6 +57,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeConversationId = searchParams.get("c");
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [gearOpen, setGearOpen] = React.useState(false);
 
@@ -54,6 +72,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
     },
     enabled: !!user,
     staleTime: 60_000,
+  });
+
+  const { data: conversations } = useQuery({
+    queryKey: ["conversations"],
+    queryFn: () => api<{ items: ConversationSummary[] }>("/conversations"),
+    enabled: !!user,
   });
 
   React.useEffect(() => {
@@ -87,16 +111,54 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r border-line bg-bg px-3 pb-4 pt-5 md:flex">
-        <div className="flex items-center gap-2.5 px-2.5 pb-5">
+        <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-4">
           <span className="flex size-[26px] items-center justify-center rounded-lg bg-btn text-[13px] font-semibold tracking-[-0.02em] text-btn-ink">
             B
           </span>
           <span className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">BrainChain</span>
-        </div>
-        <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Main">
+        </Link>
+
+        <button
+          onClick={() => router.push("/")}
+          className="mb-3 flex items-center gap-2.5 rounded-[7px] border border-line px-2.5 py-[7px] text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2/60 hover:text-ink"
+        >
+          <Plus className="size-3.5" />
+          New chat
+        </button>
+
+        <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Conversation history">
+          {conversations && conversations.items.length === 0 ? (
+            <p className="px-2.5 py-2 text-[12.5px] text-ink-3">No conversations yet</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {(conversations?.items ?? []).map((conversation) => {
+                const active = conversation.id === activeConversationId;
+                return (
+                  <li key={conversation.id}>
+                    <Link
+                      href={`/?c=${conversation.id}`}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-2 rounded-[7px] px-2.5 py-[7px] text-[13px] transition-colors",
+                        active
+                          ? "bg-panel-2 font-semibold text-ink"
+                          : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
+                      )}
+                    >
+                      <MessageSquare className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+                      <span className="truncate">{conversation.title}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </nav>
+
+        <div className="space-y-0.5 border-t border-line pt-2">
           <ul className="space-y-0.5">
             {NAV_ITEMS.map((item) => {
-              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const active = pathname.startsWith(item.href);
               const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
               return (
                 <li key={item.href}>
@@ -130,7 +192,54 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </ul>
-        </nav>
+          <Link
+            href="/library"
+            className="block px-2.5 py-1.5 text-[12.5px] text-ink-3 transition-colors hover:text-ink"
+          >
+            Library
+          </Link>
+          {gearItems.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setGearOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={gearOpen}
+                className="flex w-full items-center gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-normal text-ink-2 transition-colors hover:bg-panel-2/60 hover:text-ink"
+              >
+                <Settings className="size-3.5 text-ink-3" aria-hidden />
+                Settings
+              </button>
+              {gearOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    className="fixed inset-0 z-10 cursor-default"
+                    onClick={() => setGearOpen(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute bottom-full left-0 z-20 mb-2 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
+                  >
+                    {gearItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        role="menuitem"
+                        onClick={() => setGearOpen(false)}
+                        className="block truncate rounded-lg px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-2.5 border-t border-line px-2.5 pt-3.5">
           <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-panel-2 text-[11.5px] font-semibold text-ink-2">
             {user.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
@@ -169,46 +278,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           >
             {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
           </button>
-          {gearItems.length > 0 && (
-            <div className="relative inline-block">
-              <button
-                onClick={() => setGearOpen((v) => !v)}
-                aria-label="Settings"
-                aria-haspopup="menu"
-                aria-expanded={gearOpen}
-                className="rounded-[7px] border border-line p-1.5 text-ink-3 hover:border-line-strong hover:text-ink"
-              >
-                <Settings className="size-3.5" />
-              </button>
-              {gearOpen && (
-                <>
-                  <button
-                    type="button"
-                    aria-hidden="true"
-                    tabIndex={-1}
-                    className="fixed inset-0 z-10 cursor-default"
-                    onClick={() => setGearOpen(false)}
-                  />
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
-                  >
-                    {gearItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        role="menuitem"
-                        onClick={() => setGearOpen(false)}
-                        className="block truncate rounded-lg px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
         </header>
         <main className="flex-1 px-5 pb-16 pt-4 md:px-10">{children}</main>
       </div>

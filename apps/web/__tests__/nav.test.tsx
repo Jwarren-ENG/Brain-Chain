@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, GEAR_ITEMS } from "../components/shell";
 
 describe("collapsed navigation", () => {
-  it("sidebar has exactly Home, Meetings, My work", () => {
-    expect(NAV_ITEMS.map((i) => i.href)).toEqual(["/", "/meetings", "/approvals"]);
+  it("sidebar nav is exactly Meetings, My work (Home lives in the logo + New chat)", () => {
+    expect(NAV_ITEMS.map((i) => i.href)).toEqual(["/meetings", "/approvals"]);
     expect(NAV_ITEMS.every((i) => !i.roles)).toBe(true);
   });
   it("admin surfaces live only in the gear menu, role-gated", () => {
@@ -28,5 +28,10 @@ describe("collapsed navigation", () => {
       void dead;
     }
     expect(src).not.toMatch(/Your workspace|Company memory/);
+  });
+  it("sidebar renders a New chat affordance backed by the conversation history", () => {
+    const src = readFileSync(join(__dirname, "../components/shell.tsx"), "utf8");
+    expect(src).toMatch(/New chat/);
+    expect(src).toMatch(/"\/conversations"/);
   });
 });
