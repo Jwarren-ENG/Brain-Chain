@@ -20,29 +20,17 @@ function HomePageInner() {
   const c = params.get("c");
   const q = params.get("q");
 
-  // The bare "/" case needs one extra bit of care: Next hands back a
-  // brand-new `URLSearchParams` instance on EVERY navigation — even a
-  // `router.push("/")` fired while already sitting on the bare "/" with no
-  // `c`/`q` (e.g. "+ New chat" clicked on a thread that was typed straight
-  // into the composer and never touched the URL at all). A key derived from
-  // string content alone would read `"new"` both before and after that
-  // click, so React would never remount `ChatHome` and the thread would
-  // silently survive "+ New chat" — this is exactly the defect the fix
-  // history above (F3) describes. `identityRef` remembers the last `params`
-  // instance actually seen; when the bare "/" recurs behind a new instance,
-  // it bumps a nonce so the key still changes even though its text doesn't.
-  // `c`/`q` changes already change the key via their own content, so the
-  // nonce only needs to move for the content-invariant bare case.
-  const identityRef = React.useRef<{ params: URLSearchParams; nonce: number }>({
-    params,
-    nonce: 0,
-  });
-  if (identityRef.current.params !== params) {
-    const nonce = !c && !q ? identityRef.current.nonce + 1 : identityRef.current.nonce;
-    identityRef.current = { params, nonce };
-  }
-
-  const key = c ?? (q ? `q:${q}` : `new:${identityRef.current.nonce}`);
+  // The bare "/" case needs an explicit disambiguator in the URL itself:
+  // Next memoizes `useSearchParams()` on the canonical URL STRING, so a
+  // `router.push("/")` fired while already sitting on bare "/" (e.g. "+ New
+  // chat" clicked on a thread that was typed straight into the composer and
+  // never touched the URL) returns the IDENTICAL `params` instance — no
+  // render-time identity trick can detect that as a change, because nothing
+  // actually changed. Instead, "+ New chat" (`shell.tsx`) pushes
+  // `/?n=<timestamp>`, so the key is a pure function of URL CONTENT: `n`
+  // supplies a fresh value on every new-chat click, same as `c`/`q` do for
+  // their own cases.
+  const key = c ?? (q ? `q:${q}` : `new:${params.get("n") ?? "0"}`);
   return <ChatHome key={key} />;
 }
 

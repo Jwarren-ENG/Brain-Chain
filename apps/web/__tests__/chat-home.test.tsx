@@ -201,16 +201,16 @@ describe("HomePage conversation-identity remounts", () => {
 
   // A thread started by typing directly into the composer at bare "/" never
   // touches the URL at all (it only gets a `conversation_id` in local
-  // state, from `/ask`'s response) — so "+ New chat" (`router.push("/")`)
-  // lands back on a URL whose CONTENT hasn't changed (still bare). A key
-  // derived from string content alone ("new" before and after) would never
-  // change, and `ChatHome` would never remount — silently reintroducing the
-  // exact defect the fix history above (F3) already fixed once, just with a
-  // different mechanism causing it. This is covered by Next handing back a
-  // brand-new `URLSearchParams` INSTANCE on every navigation, even when its
-  // content is unchanged: `HomePage`'s nonce-bumping `identityRef` turns
-  // that instance change into a genuine key change for the bare case.
-  it("clears a thread started by typing at home when '+ New chat' navigates back to the bare '/'", async () => {
+  // state, from `/ask`'s response). "+ New chat" (`shell.tsx`) pushes
+  // `/?n=<timestamp>` rather than plain `/`, so the URL's CONTENT genuinely
+  // changes on every click — unlike a bare `router.push("/")`, which Next
+  // resolves to the SAME memoized `searchParams` instance when already
+  // sitting on bare "/", and which a content-derived key could never detect.
+  // Simulate that real navigation by changing the mock's URL content (adding
+  // `n=123`), not by hand-constructing a fresh same-content `URLSearchParams`
+  // instance (Next never does that for an unchanged URL, so a test relying
+  // on it would pass for reasons the real router can't reproduce).
+  it("clears a thread started by typing at home when '+ New chat' navigates to '/?n=...'", async () => {
     const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
     const HomePage = (await import("../app/(app)/page")).default;
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -234,10 +234,10 @@ describe("HomePage conversation-identity remounts", () => {
       expect(screen.getByText("answer to: what killed the 7075 batch?")).toBeInTheDocument(),
     );
 
-    // "+ New chat" → `router.push("/")`. The URL is already bare, but a real
-    // navigation still hands the component a brand-new `searchParams`
-    // instance — simulate that (not just re-rendering with the same object).
-    chatHomeState.searchParams = new URLSearchParams();
+    // "+ New chat" → `router.push("/?n=<timestamp>")`. The mock's URL
+    // content changes (a fresh `n`), which is what the pure content-derived
+    // key in `page.tsx` actually keys off.
+    chatHomeState.searchParams = new URLSearchParams("n=123");
     rerender(
       <QueryClientProvider client={queryClient}>
         <HomePage />

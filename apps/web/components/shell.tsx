@@ -91,6 +91,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // "+ New chat" must land on a URL that's distinguishable from whatever bare
+  // "/" the user is already sitting on — a plain `router.push("/")` from
+  // bare "/" returns the SAME memoized `searchParams` instance from Next
+  // (identity, not content, is what changed previously), so a thread typed
+  // straight into the composer never cleared. Appending an explicit,
+  // always-fresh `?n=<timestamp>` makes the new-chat navigation a genuine
+  // URL *content* change every time, which `HomePage`'s remount key can key
+  // off directly. The logo click intentionally starts a fresh chat too
+  // (ChatGPT-like semantics: clicking the brand while mid-thread returns you
+  // to a blank home, not just "the same conversation, again").
+  const goNewChat = () => router.push(`/?n=${Date.now()}`);
+
   const logout = async () => {
     try {
       await api("/auth/logout", { method: "POST" });
@@ -111,7 +123,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r border-line bg-bg px-3 pb-4 pt-5 md:flex">
-        <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-4">
+        <Link
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            goNewChat();
+          }}
+          className="flex items-center gap-2.5 px-2.5 pb-4"
+        >
           <span className="flex size-[26px] items-center justify-center rounded-lg bg-btn text-[13px] font-semibold tracking-[-0.02em] text-btn-ink">
             B
           </span>
@@ -119,7 +138,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <button
-          onClick={() => router.push("/")}
+          onClick={goNewChat}
           className="mb-3 flex items-center gap-2.5 rounded-[7px] border border-line px-2.5 py-[7px] text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2/60 hover:text-ink"
         >
           <Plus className="size-3.5" />
