@@ -35,7 +35,7 @@ reset & preflight before every demo; the six beats below are the story.
    - Slack: `cd apps/slack && ../../.venv/bin/python app.py` (needs `SLACK_BOT_TOKEN`,
      `SLACK_APP_TOKEN`, `BRAINCHAIN_SERVICE_TOKEN` matching step 2's
      `BRAINCHAIN_SLACK_SERVICE_TOKEN` — see [apps/slack/README.md](../../apps/slack/README.md))
-6. Warm-up: ask one throwaway question in **/ask** so the first real-model call (slowest,
+6. Warm-up: ask one throwaway question in the web app's chat (home page) so the first real-model call (slowest,
    cold) happens off-camera.
 7. Slack sanity: DM the bot "ping" as the demo engineer's mapped Slack account and confirm
    a reply comes back before going live.
@@ -72,7 +72,7 @@ reset & preflight before every demo; the six beats below are the story.
   acknowledge it out loud and retry once. Do **not** switch to the mock mid-demo; its
   answers are keyword-assembled and off-brand for "nothing canned" — it will read as a
   downgrade, not a fallback.
-- **Slack down**: fall back to the identical question in **/ask** on the web app — same
+- **Slack down**: fall back to the identical question in the web app's chat (home page) — same
   memory, same citations, different surface. That parity *is* the platform point, so
   narrate it as a feature, not a workaround.
 - **Full reset mid-demo**: re-run steps 1–3 of the preflight (seed, reembed) — about two

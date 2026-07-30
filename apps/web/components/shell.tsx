@@ -338,7 +338,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && query.trim()) {
-                go(`/ask?q=${encodeURIComponent(query.trim())}`);
+                go(`/?q=${encodeURIComponent(query.trim())}`);
               }
               if (e.key === "Escape") onClose();
             }}
@@ -349,7 +349,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="max-h-80 overflow-y-auto scroll-thin p-2">
           {query.trim().length > 2 && (
             <button
-              onClick={() => go(`/ask?q=${encodeURIComponent(query.trim())}`)}
+              onClick={() => go(`/?q=${encodeURIComponent(query.trim())}`)}
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-ink hover:bg-panel-2"
             >
               <Sparkles className="size-4 text-accent" />
