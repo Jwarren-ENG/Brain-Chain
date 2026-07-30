@@ -51,7 +51,7 @@ export function ChatHome() {
   const [openDoc, setOpenDoc] = React.useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
-  const initialParamHandled = React.useRef(false);
+  const autoAskedRef = React.useRef(false);
 
   const { data: home } = useQuery({
     queryKey: ["home"],
@@ -130,22 +130,40 @@ export function ChatHome() {
     setSelectedMessage(lastAssistant?.id ?? null);
   }, []);
 
-  // `?q=` auto-asks once on mount; `?c=` loads that conversation (Task 2's
-  // sidebar links to it). The ref guards against re-firing on subsequent
-  // param changes (e.g. the browser back button).
+  const q = params.get("q");
+  const c = params.get("c");
+
+  // `?q=` auto-asks exactly once, ever — the ref guards against re-firing on
+  // subsequent param changes (e.g. the browser back button).
   React.useEffect(() => {
-    if (initialParamHandled.current) return;
-    const q = params.get("q");
-    const c = params.get("c");
+    if (autoAskedRef.current) return;
     if (q) {
-      initialParamHandled.current = true;
+      autoAskedRef.current = true;
       askMutation.mutate(q);
-    } else if (c) {
-      initialParamHandled.current = true;
-      loadConversation(c);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [q]);
+
+  // `?c=` is reactive to VALUE changes, not just mount: Task 2's sidebar
+  // links to `/?c=<id>` while ChatHome may already be mounted (same-route
+  // search-param navigation doesn't remount in the App Router), so a second
+  // click to a different conversation must still load it. Skipped when `q`
+  // is present so the two entry points don't race on initial mount; guarded
+  // against reloading the conversation that's already active (avoids a
+  // loop, since `loadConversation` sets `conversationId` but never touches
+  // the `c` param itself). When `c` is removed (e.g. "+ New chat" → `/`)
+  // while a `c`-loaded conversation is active, the thread is cleared.
+  React.useEffect(() => {
+    if (q) return;
+    if (c) {
+      if (c !== conversationId) loadConversation(c);
+    } else if (conversationId) {
+      setConversationId(null);
+      setMessages([]);
+      setSelectedMessage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c]);
 
   function handleImported(result: MeetingImportResponse) {
     queryClient.invalidateQueries({ queryKey: ["meetings"] });
