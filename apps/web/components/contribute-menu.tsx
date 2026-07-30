@@ -21,11 +21,15 @@ export function ContributeMenu({
   onImported,
   importFn,
   classifications,
+  variant = "full",
 }: {
   user: Pick<UserInfo, "roles"> | null;
   onImported: (result: MeetingImportResponse) => void;
   importFn: (form: FormData) => Promise<MeetingImportResponse>;
   classifications: Classification[];
+  /** `"icon"` renders a compact `[+]`-only trigger, for tight spaces like the
+   * chat composer, instead of the full "Contribute" button. */
+  variant?: "full" | "icon";
 }) {
   const [open, setOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
@@ -37,8 +41,10 @@ export function ContributeMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={variant === "icon" ? "Contribute" : undefined}
+        className={variant === "icon" ? "w-9 shrink-0 px-0" : undefined}
       >
-        <Plus className="size-3.5" /> Contribute
+        <Plus className="size-3.5" /> {variant === "icon" ? null : "Contribute"}
       </Button>
 
       {open && (
