@@ -268,6 +268,14 @@ describe("ChatHome ?c= reactivity", () => {
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(apiMock.mock.calls.filter((c) => c[0] === "/ask")).toHaveLength(1);
+    // Regression guard: the clear-thread effect (deps `[c, q, params]`) also
+    // re-runs on this same re-render, since `router.replace("/")` handed
+    // back a fresh `searchParams` object with neither `c` nor `q`. Without
+    // `selfNavigationRef` distinguishing "we just stripped our own `?q=`"
+    // from a genuine navigation to bare `/`, that effect would see
+    // `!c && !q && conversationId` (conversationId was just set by the ask)
+    // and wipe the thread it just created — the answer must still be here.
+    expect(screen.queryByText("answer to: a")).toBeInTheDocument();
 
     // A genuinely NEW `?q=` value — e.g. a second ⌘K palette ask from home —
     // must fire again.

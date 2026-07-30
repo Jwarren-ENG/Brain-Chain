@@ -52,6 +52,7 @@ export function ChatHome() {
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const lastHandledQRef = React.useRef<string | null>(null);
+  const selfNavigationRef = React.useRef(false);
 
   const { data: home } = useQuery({
     queryKey: ["home"],
@@ -146,6 +147,7 @@ export function ChatHome() {
     if (!q || lastHandledQRef.current === q) return;
     lastHandledQRef.current = q;
     askMutation.mutate(q);
+    selfNavigationRef.current = true;
     router.replace("/");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
@@ -166,18 +168,24 @@ export function ChatHome() {
   // stripped of its param above), and a thread started by typing at home
   // (never had a `c`/`q` at all). "+ New chat" always lands on the bare
   // `/`, and Next's App Router hands back a fresh `searchParams` object on
-  // every navigation — even a self-navigation to an already-bare `/` — so
-  // depending on the `params` object itself (in addition to the derived
-  // `c`/`q` strings) makes this effect re-run and clear state on that
-  // navigation even though `c` and `q`'s VALUES don't change. `params`
-  // otherwise stays referentially stable across re-renders that aren't
-  // navigations (e.g. `conversationId` updating after a typed ask), so this
-  // never clears a thread out from under itself mid-conversation.
+  // EVERY navigation, including our own `router.replace("/")` call in the
+  // `?q=` effect above — so `params` is NOT referentially stable across
+  // non-navigations the way it might look; a self-triggered navigation
+  // looks identical to the user clicking "+ New chat" from this effect's
+  // point of view. `selfNavigationRef` disambiguates the two: the `?q=`
+  // effect sets it to true immediately before its own `router.replace("/")`,
+  // and this effect checks-and-consumes it before clearing, so the
+  // just-created thread survives the param strip while a genuine
+  // navigation to bare `/` (e.g. "+ New chat") still clears state.
   React.useEffect(() => {
     if (q) return;
     if (c) {
       if (c !== conversationId) loadConversation(c);
     } else if (conversationId) {
+      if (selfNavigationRef.current) {
+        selfNavigationRef.current = false;
+        return;
+      }
       setConversationId(null);
       setMessages([]);
       setSelectedMessage(null);
