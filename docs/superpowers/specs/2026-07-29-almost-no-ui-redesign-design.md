@@ -111,3 +111,28 @@ mobile.
 3. Zero fictional UI anywhere; the live-agent panel is one honest card.
 4. No internal jargon on any customer-visible surface.
 5. An engineer who only ever uses Slack loses nothing except review/admin.
+
+---
+
+## Addendum (2026-07-29, after Jacob's first hands-on): chat IS the home
+
+Directive: the web front door must read like ChatGPT/Claude/Gemini — the user is
+here to TALK to the assistant, not to "contribute" to a knowledge base
+(contribution happens autonomously in meetings). Approved layout: ChatGPT-style
+with history (option A).
+
+- **Home `/` is a full conversation**: messages render in place (reusing the
+  existing provenance/evidence rendering per answer); empty state shows a
+  greeting plus suggested-question chips; `?q=` auto-asks; `?c=<id>` opens a
+  past conversation. `/ask` becomes a query-preserving redirect to `/`.
+- **Sidebar becomes conversation history**: "+ New chat" on top, past
+  conversations from the existing `/conversations` endpoint; pinned at the
+  bottom: Meetings, My work (badge), a small Library text link, and the ⚙ gear
+  (role-gated, hidden when empty).
+- **The Contribute menu demotes to a `[+]` button inside the composer** — same
+  three role-gated entries, presented like ChatGPT's attach button. No
+  "Contribute" verb anywhere prominent.
+- Reviewers keep a slim "N items await review" banner above the thread; the
+  recent-meetings card is dropped (Meetings nav suffices).
+- All prior non-negotiables stand (no fictional UI, roles mirrored only,
+  zero backend changes, six beats survive, page-export constraint).
