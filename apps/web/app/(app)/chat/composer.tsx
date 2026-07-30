@@ -8,6 +8,13 @@ import * as React from "react";
  * The bottom-of-thread input: `[plusSlot] [textarea] [send button]`. Enter
  * submits; Shift+Enter inserts a newline. Trims on submit, ignores
  * whitespace-only input, and clears itself after a successful send.
+ *
+ * Deliberately unstyled as a "panel" (no sticky positioning, border, or
+ * background) — it's meant to sit inside a parent row that supplies that
+ * chrome alongside sibling controls (e.g. the mode `<Select>` in
+ * `ChatHome`). `position: sticky` in particular only works when applied to
+ * that outer row: this form's own containing block would otherwise be sized
+ * to the form itself, leaving sticky nothing to stick within.
  */
 export function Composer({
   onSend,
@@ -29,7 +36,7 @@ export function Composer({
 
   return (
     <form
-      className="sticky bottom-4 mt-5 flex items-end gap-2 rounded-2xl border border-line-strong bg-panel p-2 shadow-lg"
+      className="flex flex-1 items-end gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         submit();

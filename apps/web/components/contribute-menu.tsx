@@ -3,7 +3,7 @@
 import { ImportTranscriptDialog } from "@/app/(app)/meetings/import-dialog";
 import { Button } from "@/components/ui";
 import { ASSISTANT_NAME } from "@/lib/brand";
-import { hasRole } from "@/lib/utils";
+import { cn, hasRole } from "@/lib/utils";
 import type { Classification, MeetingImportResponse, UserInfo } from "@brainchain/shared";
 import { MessageCircleMore, Plus, ShieldAlert, Upload } from "lucide-react";
 import Link from "next/link";
@@ -38,6 +38,7 @@ export function ContributeMenu({
   return (
     <div className="relative inline-block">
       <Button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -59,7 +60,13 @@ export function ContributeMenu({
           />
           <div
             role="menu"
-            className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-line bg-panel p-1.5 shadow-lg"
+            className={cn(
+              "absolute z-20 w-64 rounded-xl border border-line bg-panel p-1.5 shadow-lg",
+              // The icon variant lives in the chat composer, pinned to the
+              // bottom of the viewport — open upward (like the shell's gear
+              // menu) so the panel isn't clipped by the viewport edge.
+              variant === "icon" ? "bottom-full left-0 mb-2" : "right-0 top-full mt-2",
+            )}
           >
             {canImport && (
               <MenuButton

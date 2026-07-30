@@ -353,7 +353,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-ink hover:bg-panel-2"
             >
               <Sparkles className="size-4 text-accent" />
-              Ask ${ASSISTANT_NAME}: <span className="font-medium">“{query.trim()}”</span>
+              Ask {ASSISTANT_NAME}: <span className="font-medium">“{query.trim()}”</span>
             </button>
           )}
           {data?.results.map((r) => (

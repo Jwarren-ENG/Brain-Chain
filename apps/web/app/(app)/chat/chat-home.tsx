@@ -51,7 +51,7 @@ export function ChatHome() {
   const [openDoc, setOpenDoc] = React.useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
-  const autoAskedRef = React.useRef(false);
+  const lastHandledQRef = React.useRef<string | null>(null);
 
   const { data: home } = useQuery({
     queryKey: ["home"],
@@ -133,14 +133,20 @@ export function ChatHome() {
   const q = params.get("q");
   const c = params.get("c");
 
-  // `?q=` auto-asks exactly once, ever — the ref guards against re-firing on
-  // subsequent param changes (e.g. the browser back button).
+  // `?q=` auto-asks whenever it holds a NEW value — tracked via
+  // `lastHandledQRef`, not a fire-once-ever boolean — so a second ⌘K
+  // palette ask from home (a new `?q=` value while ChatHome stays mounted)
+  // still fires. Once handled, `router.replace("/")` strips the param: this
+  // keeps the address bar clean, stops the browser back button from
+  // re-presenting the same `?q=`, and means a page reload with a stale
+  // `?q=` still in the URL only asks once per mount (fresh ref, single
+  // `mutate` call). The ref additionally guards against the effect
+  // re-running before the replace's navigation has propagated.
   React.useEffect(() => {
-    if (autoAskedRef.current) return;
-    if (q) {
-      autoAskedRef.current = true;
-      askMutation.mutate(q);
-    }
+    if (!q || lastHandledQRef.current === q) return;
+    lastHandledQRef.current = q;
+    askMutation.mutate(q);
+    router.replace("/");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
@@ -151,8 +157,22 @@ export function ChatHome() {
   // is present so the two entry points don't race on initial mount; guarded
   // against reloading the conversation that's already active (avoids a
   // loop, since `loadConversation` sets `conversationId` but never touches
-  // the `c` param itself). When `c` is removed (e.g. "+ New chat" → `/`)
-  // while a `c`-loaded conversation is active, the thread is cleared.
+  // the `c` param itself).
+  //
+  // Depends on `[c, q, params]` — not just `[c, q]`'s derived string
+  // values — because "clear the active thread" must fire whenever the URL
+  // has neither `c` nor `q`, for THREE distinct origins: a `c`-loaded
+  // conversation navigated away from, a `?q=`-started thread (already
+  // stripped of its param above), and a thread started by typing at home
+  // (never had a `c`/`q` at all). "+ New chat" always lands on the bare
+  // `/`, and Next's App Router hands back a fresh `searchParams` object on
+  // every navigation — even a self-navigation to an already-bare `/` — so
+  // depending on the `params` object itself (in addition to the derived
+  // `c`/`q` strings) makes this effect re-run and clear state on that
+  // navigation even though `c` and `q`'s VALUES don't change. `params`
+  // otherwise stays referentially stable across re-renders that aren't
+  // navigations (e.g. `conversationId` updating after a typed ask), so this
+  // never clears a thread out from under itself mid-conversation.
   React.useEffect(() => {
     if (q) return;
     if (c) {
@@ -163,7 +183,7 @@ export function ChatHome() {
       setSelectedMessage(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c]);
+  }, [c, q, params]);
 
   function handleImported(result: MeetingImportResponse) {
     queryClient.invalidateQueries({ queryKey: ["meetings"] });
@@ -265,7 +285,19 @@ export function ChatHome() {
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-2">
+        {/* The sticky positioning and panel chrome live on THIS row, not on
+            `<Composer>`'s own `<form>`: a `position: sticky` element's
+            containing block is its nearest ancestor with a defined height it
+            can be pinned within, so applying `sticky` inside a wrapper
+            that's only ever as tall as the form itself (as it was before)
+            has no room to stick and just scrolls away with the thread.
+            Anchoring it here, inside the column that also holds the full
+            message list, gives it that room. `items-end` (not
+            `items-center`) keeps the mode select's bottom edge aligned with
+            the composer's textarea/send button as the textarea grows
+            multi-line, instead of drifting as the row's overall height
+            changes. */}
+        <div className="sticky bottom-4 mt-5 flex items-end gap-2 rounded-2xl border border-line-strong bg-panel p-2 shadow-lg">
           <Select
             aria-label="Response mode"
             value={mode}
@@ -278,21 +310,19 @@ export function ChatHome() {
               </option>
             ))}
           </Select>
-          <div className="flex-1">
-            <Composer
-              onSend={submit}
-              disabled={askMutation.isPending}
-              plusSlot={
-                <ContributeMenu
-                  variant="icon"
-                  user={user}
-                  classifications={classifications?.items ?? []}
-                  onImported={handleImported}
-                  importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
-                />
-              }
-            />
-          </div>
+          <Composer
+            onSend={submit}
+            disabled={askMutation.isPending}
+            plusSlot={
+              <ContributeMenu
+                variant="icon"
+                user={user}
+                classifications={classifications?.items ?? []}
+                onImported={handleImported}
+                importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+              />
+            }
+          />
         </div>
       </div>
 
