@@ -51,8 +51,7 @@ export function ChatHome() {
   const [openDoc, setOpenDoc] = React.useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
-  const lastHandledQRef = React.useRef<string | null>(null);
-  const selfNavigationRef = React.useRef(false);
+  const hasInitializedRef = React.useRef(false);
 
   const { data: home } = useQuery({
     queryKey: ["home"],
@@ -134,64 +133,28 @@ export function ChatHome() {
   const q = params.get("q");
   const c = params.get("c");
 
-  // `?q=` auto-asks whenever it holds a NEW value — tracked via
-  // `lastHandledQRef`, not a fire-once-ever boolean — so a second ⌘K
-  // palette ask from home (a new `?q=` value while ChatHome stays mounted)
-  // still fires. Once handled, `router.replace("/")` strips the param: this
-  // keeps the address bar clean, stops the browser back button from
-  // re-presenting the same `?q=`, and means a page reload with a stale
-  // `?q=` still in the URL only asks once per mount (fresh ref, single
-  // `mutate` call). The ref additionally guards against the effect
-  // re-running before the replace's navigation has propagated.
+  // `ChatHome` is remounted (fresh component instance, fresh refs and state)
+  // by its parent (`app/(app)/page.tsx`) whenever conversation identity
+  // changes — a different `?c=<id>`, a new `?q=<query>`, or a bare `/` — via
+  // a `key` prop derived from the URL. That means this effect only ever
+  // needs to handle the identity this particular mount was born with, once:
+  // there is no reactive `?c=`/`?q=` case to handle here anymore, because a
+  // *change* to either always means a new mount with a fresh `hasInitializedRef`.
+  // `hasInitializedRef` still exists (not just relying on "effect runs once")
+  // solely to collapse React 18 StrictMode's dev-only double-invoke of
+  // effects into a single `loadConversation`/`askMutation.mutate` call —
+  // the ref persists across that fake unmount+remount cycle even though a
+  // real remount (new `key`) would reset it along with everything else.
   React.useEffect(() => {
-    if (!q || lastHandledQRef.current === q) return;
-    lastHandledQRef.current = q;
-    askMutation.mutate(q);
-    selfNavigationRef.current = true;
-    router.replace("/");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
-
-  // `?c=` is reactive to VALUE changes, not just mount: Task 2's sidebar
-  // links to `/?c=<id>` while ChatHome may already be mounted (same-route
-  // search-param navigation doesn't remount in the App Router), so a second
-  // click to a different conversation must still load it. Skipped when `q`
-  // is present so the two entry points don't race on initial mount; guarded
-  // against reloading the conversation that's already active (avoids a
-  // loop, since `loadConversation` sets `conversationId` but never touches
-  // the `c` param itself).
-  //
-  // Depends on `[c, q, params]` — not just `[c, q]`'s derived string
-  // values — because "clear the active thread" must fire whenever the URL
-  // has neither `c` nor `q`, for THREE distinct origins: a `c`-loaded
-  // conversation navigated away from, a `?q=`-started thread (already
-  // stripped of its param above), and a thread started by typing at home
-  // (never had a `c`/`q` at all). "+ New chat" always lands on the bare
-  // `/`, and Next's App Router hands back a fresh `searchParams` object on
-  // EVERY navigation, including our own `router.replace("/")` call in the
-  // `?q=` effect above — so `params` is NOT referentially stable across
-  // non-navigations the way it might look; a self-triggered navigation
-  // looks identical to the user clicking "+ New chat" from this effect's
-  // point of view. `selfNavigationRef` disambiguates the two: the `?q=`
-  // effect sets it to true immediately before its own `router.replace("/")`,
-  // and this effect checks-and-consumes it before clearing, so the
-  // just-created thread survives the param strip while a genuine
-  // navigation to bare `/` (e.g. "+ New chat") still clears state.
-  React.useEffect(() => {
-    if (q) return;
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
     if (c) {
-      if (c !== conversationId) loadConversation(c);
-    } else if (conversationId) {
-      if (selfNavigationRef.current) {
-        selfNavigationRef.current = false;
-        return;
-      }
-      setConversationId(null);
-      setMessages([]);
-      setSelectedMessage(null);
+      loadConversation(c);
+    } else if (q) {
+      askMutation.mutate(q);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c, q, params]);
+  }, []);
 
   function handleImported(result: MeetingImportResponse) {
     queryClient.invalidateQueries({ queryKey: ["meetings"] });

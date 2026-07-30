@@ -54,12 +54,18 @@ describe("Composer", () => {
 });
 
 // ---------------------------------------------------------------------
-// ChatHome's `?c=` handling must be reactive to VALUE changes, not just
-// mount: Task 2's sidebar links to `/?c=<id>` while ChatHome may already be
-// mounted (same-route search-param navigation doesn't remount in the App
-// Router). `?q=`, by contrast, must fire exactly once ever. These two
-// mechanisms are independent (a single "already handled" ref would make the
-// second `?c=` navigation silently no-op — see task-1-fix-report.md).
+// The chat home is remount-keyed: `app/(app)/page.tsx` derives a `key` from
+// URL identity (`?c=`, `?q=`, or bare "/") and mounts a fresh
+// `<ChatHome key={...} />` whenever that identity changes, instead of
+// `ChatHome` reactively patching its own state via `?c=`/`?q=`-watching
+// effects (see the fix history at the top of final-fix-report.md for why
+// that effect/ref approach kept shifting a race instead of closing it).
+// Tests that need to observe a remount — a different conversation loading,
+// "+ New chat" clearing a thread — render the PAGE's default export and
+// mutate the shared `useSearchParams()` mock between renders. Tests that
+// only need mount-time behavior (auto-ask on `?q=`, composer/multi-turn
+// behavior) render `ChatHome` directly: it still reads `?c=`/`?q=` itself,
+// just once on mount, never reactively.
 
 const chatHomeState = vi.hoisted(() => ({
   searchParams: new URLSearchParams(),
@@ -95,13 +101,19 @@ function mockMessage(id: string, content: string) {
 
 let askCounter = 0;
 
-const apiMock = vi.fn(async (path: string, options?: { body?: { query: string } }) => {
+type AskBody = { query: string; conversation_id?: string | null };
+
+const apiMock = vi.fn(async (path: string, options?: { body?: AskBody }) => {
   if (path === "/home") return { suggested_questions: [] };
   if (path === "/ask") {
     askCounter += 1;
     const query = options?.body?.query ?? "";
+    // Continuing a conversation sends its `conversation_id` back; echo it so
+    // multi-turn tests can assert the second turn stayed on the same thread.
+    // A first turn (no `conversation_id` yet) gets a freshly minted one.
+    const conversationId = options?.body?.conversation_id ?? `asked-conv-${askCounter}`;
     return {
-      conversation_id: `asked-conv-${askCounter}`,
+      conversation_id: conversationId,
       message: mockMessage(`asked-msg-${askCounter}`, `answer to: ${query}`),
     };
   }
@@ -114,56 +126,56 @@ const apiMock = vi.fn(async (path: string, options?: { body?: { query: string } 
 });
 
 vi.mock("@/lib/api", () => ({
-  api: (path: string, options?: unknown) => apiMock(path, options as { body?: { query: string } } | undefined),
+  api: (path: string, options?: unknown) => apiMock(path, options as { body?: AskBody } | undefined),
   apiUpload: vi.fn(),
 }));
 
-describe("ChatHome ?c= reactivity", () => {
+describe("HomePage conversation-identity remounts", () => {
   beforeEach(() => {
     chatHomeState.searchParams = new URLSearchParams();
     apiMock.mockClear();
     askCounter = 0;
   });
 
-  it("loads a different conversation when ?c= changes while already mounted", async () => {
+  it("remounts and loads a different conversation when ?c= changes, without refetching on an identical rerender", async () => {
     const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
-    const { ChatHome } = await import("../app/(app)/chat/chat-home");
+    const HomePage = (await import("../app/(app)/page")).default;
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     // A fresh element (not a shared/reused `const`) is created at each
     // render/rerender call site: JSX always allocates a new props object, so
-    // React treats this as a genuine update and re-invokes ChatHome — a
-    // reused element reference would let React bail out via its referential
-    // props optimization and never re-run the component, defeating the
-    // point of this test (this mirrors how Next's real router-driven
-    // `useSearchParams()` change reaches the component: some ancestor
-    // re-renders and hands down new children, it's not a no-op update).
-    const renderChatHome = () =>
+    // React treats this as a genuine update and re-invokes HomePage — this
+    // mirrors how Next's real router-driven `useSearchParams()` change
+    // reaches the tree: some ancestor re-renders and hands down new
+    // children, it's not a no-op update.
+    const renderHomePage = () =>
       render(
         <QueryClientProvider client={queryClient}>
-          <ChatHome />
+          <HomePage />
         </QueryClientProvider>,
       );
 
     chatHomeState.searchParams = new URLSearchParams("c=conv-1");
-    const { rerender } = renderChatHome();
+    const { rerender } = renderHomePage();
     await waitFor(() => expect(screen.getByText("content for conv-1")).toBeInTheDocument());
 
-    // Simulate the sidebar linking to a second conversation while ChatHome
-    // stays mounted — no remount, just a new `useSearchParams()` value.
+    // A sidebar link to a different conversation: `key` changes from
+    // "conv-1" to "conv-2" → `ChatHome` unmounts and remounts fresh, and the
+    // new mount's init effect loads conv-2.
     chatHomeState.searchParams = new URLSearchParams("c=conv-2");
     rerender(
       <QueryClientProvider client={queryClient}>
-        <ChatHome />
+        <HomePage />
       </QueryClientProvider>,
     );
     await waitFor(() => expect(screen.getByText("content for conv-2")).toBeInTheDocument());
     expect(screen.queryByText("content for conv-1")).not.toBeInTheDocument();
 
-    // Re-rendering with the SAME `c` must not refetch the active conversation.
+    // Re-rendering with the SAME `c` keeps the same `key`, so no remount and
+    // no refetch of the already-active conversation.
     const callsSoFar = apiMock.mock.calls.filter((c) => c[0] === "/conversations/conv-2").length;
     rerender(
       <QueryClientProvider client={queryClient}>
-        <ChatHome />
+        <HomePage />
       </QueryClientProvider>,
     );
     await new Promise((r) => setTimeout(r, 0));
@@ -171,11 +183,12 @@ describe("ChatHome ?c= reactivity", () => {
       apiMock.mock.calls.filter((c) => c[0] === "/conversations/conv-2").length,
     ).toBe(callsSoFar);
 
-    // Removing `c` (e.g. "+ New chat" navigating to `/`) clears the thread.
+    // Removing `c` (e.g. "+ New chat" navigating to `/`) changes the key to
+    // "new:*" → remount → cleared thread.
     chatHomeState.searchParams = new URLSearchParams();
     rerender(
       <QueryClientProvider client={queryClient}>
-        <ChatHome />
+        <HomePage />
       </QueryClientProvider>,
     );
     await waitFor(() =>
@@ -186,28 +199,29 @@ describe("ChatHome ?c= reactivity", () => {
     expect(screen.queryByText("content for conv-2")).not.toBeInTheDocument();
   });
 
-  // A thread started by typing at home never has a `?c=` (it only gets a
-  // `conversation_id` in local state, from `/ask`'s response) — before this
-  // fix, the clear-thread effect only reacted to `c` changing, so "+ New
-  // chat" (`router.push("/")`, landing back on the already-bare `/`) was a
-  // silent no-op for exactly this thread. It's covered here by depending on
-  // the `searchParams` object itself: a genuine "+ New chat" click always
-  // produces a fresh `URLSearchParams` from Next's router, even when the
-  // destination URL is unchanged, so a freshly-constructed (contentwise
-  // identical) instance is what a real navigation looks like from the
-  // component's point of view.
+  // A thread started by typing directly into the composer at bare "/" never
+  // touches the URL at all (it only gets a `conversation_id` in local
+  // state, from `/ask`'s response) — so "+ New chat" (`router.push("/")`)
+  // lands back on a URL whose CONTENT hasn't changed (still bare). A key
+  // derived from string content alone ("new" before and after) would never
+  // change, and `ChatHome` would never remount — silently reintroducing the
+  // exact defect the fix history above (F3) already fixed once, just with a
+  // different mechanism causing it. This is covered by Next handing back a
+  // brand-new `URLSearchParams` INSTANCE on every navigation, even when its
+  // content is unchanged: `HomePage`'s nonce-bumping `identityRef` turns
+  // that instance change into a genuine key change for the bare case.
   it("clears a thread started by typing at home when '+ New chat' navigates back to the bare '/'", async () => {
     const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
-    const { ChatHome } = await import("../app/(app)/chat/chat-home");
+    const HomePage = (await import("../app/(app)/page")).default;
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const renderChatHome = () =>
+    const renderHomePage = () =>
       render(
         <QueryClientProvider client={queryClient}>
-          <ChatHome />
+          <HomePage />
         </QueryClientProvider>,
       );
 
-    const { rerender } = renderChatHome();
+    const { rerender } = renderHomePage();
     await waitFor(() =>
       expect(screen.getByText("What does your company need to remember?")).toBeInTheDocument(),
     );
@@ -226,7 +240,7 @@ describe("ChatHome ?c= reactivity", () => {
     chatHomeState.searchParams = new URLSearchParams();
     rerender(
       <QueryClientProvider client={queryClient}>
-        <ChatHome />
+        <HomePage />
       </QueryClientProvider>,
     );
 
@@ -235,57 +249,93 @@ describe("ChatHome ?c= reactivity", () => {
     );
     expect(screen.queryByText("answer to: what killed the 7075 batch?")).not.toBeInTheDocument();
   });
+});
 
-  // Before this fix, `?q=` auto-asked exactly once ever (a boolean ref), so
-  // a second ⌘K palette ask from home (a fresh `?q=` while ChatHome stayed
-  // mounted) was silently swallowed. It must now fire for every genuinely
-  // NEW `?q=` value, while a page reload or back-navigation to the SAME
-  // value must not re-ask.
-  it("fires a fresh ask for each new ?q= palette search, but not for a repeat of the same value", async () => {
+describe("ChatHome mount-time ?q=/?c= handling and conversation continuity", () => {
+  beforeEach(() => {
+    chatHomeState.searchParams = new URLSearchParams();
+    apiMock.mockClear();
+    askCounter = 0;
+  });
+
+  // `tree` rebuilds a fresh element bound to the SAME `queryClient` and
+  // `ChatHome` reference, for tests that need to `rerender` the identical
+  // mounted instance (no key change, so no remount) rather than mount a
+  // second one.
+  const renderChatHome = async () => {
     const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
     const { ChatHome } = await import("../app/(app)/chat/chat-home");
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const renderChatHome = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <ChatHome />
-        </QueryClientProvider>,
-      );
+    const tree = () => (
+      <QueryClientProvider client={queryClient}>
+        <ChatHome />
+      </QueryClientProvider>
+    );
+    return { ...render(tree()), tree };
+  };
 
+  // `?q=` auto-asks exactly once per mount, and the answer is never wiped
+  // afterward — there's no more post-ask `router.replace("/")` to race
+  // against a clear-thread effect (that effect no longer exists at all: a
+  // genuinely new `?q=` value only ever reaches `ChatHome` via a fresh
+  // mount, key'd by `HomePage`, with its own fresh `hasInitializedRef`).
+  it("auto-asks once for a ?q= on mount, and the answer persists (no re-ask on a same-mount rerender)", async () => {
     chatHomeState.searchParams = new URLSearchParams("q=a");
-    const { rerender } = renderChatHome();
+    const { rerender, tree } = await renderChatHome();
     await waitFor(() => expect(screen.getByText("answer to: a")).toBeInTheDocument());
     expect(apiMock.mock.calls.filter((c) => c[0] === "/ask")).toHaveLength(1);
 
-    // Simulate the production `router.replace("/")` that fires once the `?q=`
-    // is handled, stripping it from the URL — a re-render with the SAME `q`
-    // value (still "a", now absent) must not trigger a second ask.
-    chatHomeState.searchParams = new URLSearchParams();
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <ChatHome />
-      </QueryClientProvider>,
-    );
+    // Re-rendering the SAME mounted instance (no key change, so no remount)
+    // with the same `?q=` must not fire a second ask — `hasInitializedRef`
+    // guards this within a single mount, independent of remount-keying.
+    rerender(tree());
     await new Promise((r) => setTimeout(r, 0));
     expect(apiMock.mock.calls.filter((c) => c[0] === "/ask")).toHaveLength(1);
-    // Regression guard: the clear-thread effect (deps `[c, q, params]`) also
-    // re-runs on this same re-render, since `router.replace("/")` handed
-    // back a fresh `searchParams` object with neither `c` nor `q`. Without
-    // `selfNavigationRef` distinguishing "we just stripped our own `?q=`"
-    // from a genuine navigation to bare `/`, that effect would see
-    // `!c && !q && conversationId` (conversationId was just set by the ask)
-    // and wipe the thread it just created — the answer must still be here.
-    expect(screen.queryByText("answer to: a")).toBeInTheDocument();
+    expect(screen.getByText("answer to: a")).toBeInTheDocument();
+  });
 
-    // A genuinely NEW `?q=` value — e.g. a second ⌘K palette ask from home —
-    // must fire again.
-    chatHomeState.searchParams = new URLSearchParams("q=b");
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <ChatHome />
-      </QueryClientProvider>,
+  it("loads the conversation for a ?c= present on mount", async () => {
+    chatHomeState.searchParams = new URLSearchParams("c=conv-9");
+    await renderChatHome();
+    await waitFor(() => expect(screen.getByText("content for conv-9")).toBeInTheDocument());
+    expect(apiMock.mock.calls.filter((c) => c[0] === "/conversations/conv-9")).toHaveLength(1);
+  });
+
+  // Continuing a conversation (a second send within the same mount) must
+  // stay on the same thread: `conversationId` is local state set by the
+  // first ask's response, not derived from the URL, so it survives across
+  // sends without any key change or remount.
+  it("continues a conversation across two sends: the second /ask carries conversation_id and both answers remain", async () => {
+    await renderChatHome();
+    await waitFor(() =>
+      expect(screen.getByText("What does your company need to remember?")).toBeInTheDocument(),
     );
-    await waitFor(() => expect(screen.getByText("answer to: b")).toBeInTheDocument());
-    expect(apiMock.mock.calls.filter((c) => c[0] === "/ask")).toHaveLength(2);
+
+    const askText = (text: string) => {
+      fireEvent.change(screen.getByRole("textbox", { name: "Question" }), {
+        target: { value: text },
+      });
+      fireEvent.submit(screen.getByRole("textbox", { name: "Question" }).closest("form")!);
+    };
+
+    askText("first question");
+    await waitFor(() => expect(screen.getByText("answer to: first question")).toBeInTheDocument());
+    const firstAskCall = apiMock.mock.calls.find(
+      (c) => c[0] === "/ask" && (c[1] as { body?: AskBody })?.body?.query === "first question",
+    );
+    expect((firstAskCall?.[1] as { body?: AskBody })?.body?.conversation_id).toBeFalsy();
+
+    askText("second question");
+    await waitFor(() =>
+      expect(screen.getByText("answer to: second question")).toBeInTheDocument(),
+    );
+    const secondAskCall = apiMock.mock.calls.find(
+      (c) => c[0] === "/ask" && (c[1] as { body?: AskBody })?.body?.query === "second question",
+    );
+    expect((secondAskCall?.[1] as { body?: AskBody })?.body?.conversation_id).toBe("asked-conv-1");
+
+    // Both turns' answers are visible in the same thread.
+    expect(screen.getByText("answer to: first question")).toBeInTheDocument();
+    expect(screen.getByText("answer to: second question")).toBeInTheDocument();
   });
 });
