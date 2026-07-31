@@ -46,7 +46,13 @@ export const SWITCHER_ITEMS: NavItem[] = [
 /** Admin/manage surfaces, relocated out of the sidebar into the gear menu. Role arrays copied verbatim from the prior NAV. */
 export const GEAR_ITEMS: NavItem[] = [
   { href: "/insights", label: "Team signals", roles: ["manager", "executive", "security_admin"] },
-  { href: "/integrations", label: "Connected sources", roles: ["data_steward", "system_admin", "security_admin"] },
+  {
+    href: "/integrations",
+    label: "Connections",
+    // Managers can view connection status (read endpoints are open to any
+    // authenticated user); sync/setup actions stay admin-gated server-side.
+    roles: ["manager", "executive", "data_steward", "system_admin", "security_admin"],
+  },
   { href: "/governance", label: "Data governance", roles: ["data_steward", "system_admin", "security_admin"] },
   { href: "/policies", label: "Model policies", roles: ["security_admin", "system_admin"] },
   { href: "/audit", label: "Audit log", roles: ["security_admin", "system_admin"] },

@@ -1,8 +1,7 @@
 "use client";
 
-import { ContributeMenu } from "@/components/contribute-menu";
 import { useSession } from "@/components/providers";
-import { CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
+import { Button, CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
 import { api, apiUpload } from "@/lib/api";
 import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
@@ -21,6 +20,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { ImportTranscriptDialog } from "./import-dialog";
 import { MeetingCard } from "./meeting-card";
 import { InvitePanel } from "./invite-panel";
 
@@ -30,6 +30,7 @@ export default function MeetingsPage() {
   const queryClient = useQueryClient();
   const [openMeeting, setOpenMeeting] = React.useState<MeetingInfo | null>(null);
   const [reflectionOpen, setReflectionOpen] = React.useState<MeetingInfo | null>(null);
+  const [importOpen, setImportOpen] = React.useState(false);
 
   const canImport = hasRole(user, "manager", "data_steward", "system_admin");
 
@@ -58,26 +59,24 @@ export default function MeetingsPage() {
           </h1>
           <p className="mt-1 text-sm text-ink-3">Recaps, decisions, and follow-through from every captured meeting.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ContributeMenu
-            user={user}
-            classifications={classifications?.items ?? []}
-            onImported={handleImported}
-            importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
-          />
-        </div>
       </header>
 
       <InvitePanel
         importSlot={
-          <ContributeMenu
-            user={user}
-            classifications={classifications?.items ?? []}
-            onImported={handleImported}
-            importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
-          />
+          canImport ? (
+            <Button onClick={() => setImportOpen(true)}>Import a recording or transcript</Button>
+          ) : null
         }
       />
+      {canImport && (
+        <ImportTranscriptDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          classifications={classifications?.items ?? []}
+          onImported={handleImported}
+          importFn={(form) => apiUpload<MeetingImportResponse>("/meetings/import", form)}
+        />
+      )}
 
       {isError ? (
         <ErrorState message="Couldn't load meetings. The API may be down." onRetry={() => refetch()} />
