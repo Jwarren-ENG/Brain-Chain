@@ -574,10 +574,18 @@ def resolve_provider(
     user: User,
     org: Organization,
     max_content_level: int,
+    requested_provider_id: str | None = None,
 ) -> tuple[ModelProviderClient, ModelProvider | None, list[str]]:
     """Pick the highest-priority enabled policy whose provider is allowed to
     see content at `max_content_level` for this user. Falls back to the local
-    mock provider, which is always permitted (it never leaves the process)."""
+    mock provider, which is always permitted (it never leaves the process).
+
+    `requested_provider_id` is the user's model choice from the composer
+    picker. It can only NARROW the search to policies for that provider —
+    every policy gate (classification ceiling, department/role scoping,
+    external-call rules) still applies, so a request can never widen access.
+    If no permitted policy matches the request, resolution falls back to the
+    normal order with a note the UI can surface."""
     settings = get_settings()
     notes: list[str] = []
 
@@ -593,6 +601,8 @@ def resolve_provider(
     for policy in policies:
         provider = policy.provider
         if not provider or not provider.enabled:
+            continue
+        if requested_provider_id and provider.id != requested_provider_id:
             continue
         if policy.max_classification_level < max_content_level:
             notes.append(
@@ -616,6 +626,14 @@ def resolve_provider(
                 continue
             return client, provider, notes
         return MockProvider(), provider, notes
+
+    if requested_provider_id:
+        notes.append(
+            "The requested model is not available under your policies; "
+            "answered with the default instead."
+        )
+        client, provider, fallback_notes = resolve_provider(db, user, org, max_content_level)
+        return client, provider, [*notes, *fallback_notes]
 
     notes.append("No policy matched; using the built-in local provider.")
     return MockProvider(), None, notes

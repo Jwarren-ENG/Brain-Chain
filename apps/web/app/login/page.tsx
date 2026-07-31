@@ -8,14 +8,11 @@ import { Brain, Lock, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+/* One quick-login profile only (Jacob, 2026-07-30). Morgan can chat, import
+   meetings, and review captures — the full demo path. Other seeded accounts
+   still exist for permission demos; log into them by typing the email. */
 const PERSONAS = [
-  { email: "avery.chen@heliosaerodyne.com", name: "Avery Chen", role: "Employee · Engineering" },
   { email: "morgan.reyes@heliosaerodyne.com", name: "Morgan Reyes", role: "Manager · Program Mgmt" },
-  { email: "jordan.blake@heliosaerodyne.com", name: "Jordan Blake", role: "Executive · COO" },
-  { email: "taylor.brooks@heliosaerodyne.com", name: "Taylor Brooks", role: "Agent Approver" },
-  { email: "sam.okafor@heliosaerodyne.com", name: "Sam Okafor", role: "Data Steward" },
-  { email: "riley.novak@heliosaerodyne.com", name: "Riley Novak", role: "Security Admin" },
-  { email: "casey.kim@heliosaerodyne.com", name: "Casey Kim", role: "System Admin" },
 ];
 
 export default function LoginPage() {
@@ -102,11 +99,10 @@ export default function LoginPage() {
         </div>
 
         <Card className="p-5">
-          <h2 className="text-sm font-semibold text-ink">Demo personas</h2>
+          <h2 className="text-sm font-semibold text-ink">Demo login</h2>
           <p className="mt-0.5 text-xs text-ink-3">
-            Helios Aerodyne (fictional aerospace &amp; defense). Every account uses the seeded
-            password <code className="rounded bg-panel-2 px-1 font-mono">brainchain-demo</code>.
-            Each role sees different information — try the same question as Avery and Morgan.
+            Helios Aerodyne (fictional aerospace &amp; defense). Password:{" "}
+            <code className="rounded bg-panel-2 px-1 font-mono">brainchain-demo</code>.
           </p>
           <ul className="mt-3 space-y-1.5">
             {PERSONAS.map((p) => (

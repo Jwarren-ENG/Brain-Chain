@@ -18,6 +18,7 @@ def ask(
     mode: str = "direct",
     conversation_id: str | None = None,
     filters: dict | None = None,
+    provider_id: str | None = None,
 ) -> tuple[Conversation, LLMMessage, LLMMessage]:
     org = db.get(Organization, user.org_id)
     filters = filters or {}
@@ -48,7 +49,9 @@ def ask(
         project=filters.get("project"),
     )
     max_level = max((rc.document.classification.level for rc in chunks), default=0)
-    client, provider_row, policy_notes = resolve_provider(db, user, org, max_level)
+    client, provider_row, policy_notes = resolve_provider(
+        db, user, org, max_level, requested_provider_id=provider_id
+    )
     answer = client.generate(query, mode, chunks)
 
     assistant_msg = LLMMessage(

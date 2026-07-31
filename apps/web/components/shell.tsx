@@ -34,11 +34,13 @@ interface ConversationSummary {
   created_at: string;
 }
 
-/** The pinned sidebar nav: Meetings, My work. Home lives in the logo + "+ New
- * chat" affordances above the conversation history, not as a NAV_ITEMS entry. */
-export const NAV_ITEMS: NavItem[] = [
+/* The top-of-page surface switcher (ChatGPT-app style): employees see two
+   surfaces only — talk to the Curator, or review the meetings it attended.
+   The tasks page is gone from the employee surface entirely (action items
+   live in the company's own PM tools; see the Curator spec §1.5). */
+export const SWITCHER_ITEMS: NavItem[] = [
+  { href: "/", label: "Chat" },
   { href: "/meetings", label: "Meetings" },
-  { href: "/approvals", label: "My work", badgeKey: "work" },
 ];
 
 /** Admin/manage surfaces, relocated out of the sidebar into the gear menu. Role arrays copied verbatim from the prior NAV. */
@@ -61,18 +63,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const activeConversationId = searchParams.get("c");
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [gearOpen, setGearOpen] = React.useState(false);
-
-  const { data: workCount } = useQuery({
-    queryKey: ["nav-work-count"],
-    queryFn: async () => {
-      const tasks = await api<{ items: unknown[] }>("/tasks", {
-        params: { mine: true, status_filter: "open" },
-      });
-      return tasks.items.length;
-    },
-    enabled: !!user,
-    staleTime: 60_000,
-  });
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
@@ -117,7 +107,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const badges: Record<string, number | undefined> = { work: workCount };
   const gearItems = GEAR_ITEMS.filter((item) => !item.roles || hasRole(user, ...item.roles));
 
   return (
@@ -175,42 +164,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="space-y-0.5 border-t border-line pt-2">
-          <ul className="space-y-0.5">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname.startsWith(item.href);
-              const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex items-center justify-between gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] transition-colors",
-                      active
-                        ? "bg-panel-2 font-semibold text-ink"
-                        : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        className={cn(
-                          "size-[5px] shrink-0 rounded-full",
-                          active ? "bg-accent" : "bg-transparent",
-                        )}
-                        aria-hidden
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </span>
-                    {badge !== undefined && badge > 0 && (
-                      <span className="rounded-[5px] bg-panel-2 px-1.5 py-px font-mono text-[10.5px] text-ink-3">
-                        {badge}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
           <Link
             href="/library"
             className="block px-2.5 py-1.5 text-[12.5px] text-ink-3 transition-colors hover:text-ink"
@@ -281,7 +234,31 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col md:pl-[236px]">
-        <header className="flex h-12 flex-none items-center justify-end gap-3 px-5 md:px-10">
+        <header className="flex h-12 flex-none items-center gap-3 px-5 md:px-10">
+          <nav
+            aria-label="Surface"
+            className="mx-auto flex items-center gap-1 rounded-full border border-line bg-panel p-1"
+          >
+            {SWITCHER_ITEMS.map((item) => {
+              const active =
+                item.href === "/" ? !pathname.startsWith("/meetings") : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded-full px-4 py-1 text-[13px] transition-colors",
+                    active
+                      ? "bg-btn font-semibold text-btn-ink"
+                      : "font-medium text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
           <button
             onClick={() => setPaletteOpen(true)}
             aria-label="Search (Command K)"

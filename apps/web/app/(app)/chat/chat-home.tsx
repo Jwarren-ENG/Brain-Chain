@@ -24,17 +24,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Composer } from "./composer";
 
-const MODES: { key: string; label: string }[] = [
-  { key: "direct", label: "Direct answer" },
-  { key: "detailed", label: "Detailed analysis" },
-  { key: "executive", label: "Executive summary" },
-  { key: "action_plan", label: "Action plan" },
-  { key: "research", label: "Research report" },
-  { key: "compare", label: "Compare sources" },
-  { key: "tasks", label: "Create tasks" },
-  { key: "meeting_prep", label: "Prepare meeting" },
-];
-
 export function ChatHome() {
   const { user } = useSession();
   const router = useRouter();
@@ -45,7 +34,7 @@ export function ChatHome() {
 
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<Message[]>([]);
-  const [mode, setMode] = React.useState("direct");
+  const [providerId, setProviderId] = React.useState<string>("");
   const [selectedMessage, setSelectedMessage] = React.useState<string | null>(null);
   const [hoverOrd, setHoverOrd] = React.useState<number | null>(null);
   const [openDoc, setOpenDoc] = React.useState<string | null>(null);
@@ -69,6 +58,15 @@ export function ChatHome() {
     queryFn: () => api<{ items: Classification[] }>("/governance/classifications"),
     enabled: canImport,
   });
+  const { data: models } = useQuery({
+    queryKey: ["models"],
+    queryFn: () =>
+      api<{ items: { id: string; name: string; model: string; is_external: boolean }[] }>(
+        "/models",
+      ),
+    enabled: !!user,
+    staleTime: 300_000,
+  });
 
   const proposed = (decisions?.items ?? []).filter((d) => d.status === "proposed");
   const proposedMeetingIds = Array.from(
@@ -81,7 +79,12 @@ export function ChatHome() {
     mutationFn: (query: string) =>
       api<{ conversation_id: string; message: Message }>("/ask", {
         method: "POST",
-        body: { query, mode, conversation_id: conversationId },
+        body: {
+          query,
+          mode: "direct",
+          conversation_id: conversationId,
+          provider_id: providerId || null,
+        },
       }),
     onSuccess: (data, query) => {
       const created = data.conversation_id !== conversationId;
@@ -92,7 +95,7 @@ export function ChatHome() {
           id: `local-${Date.now()}`,
           role: "user",
           content: query,
-          mode,
+          mode: "direct",
           provider: "",
           model: "",
           segments: [],
@@ -269,18 +272,21 @@ export function ChatHome() {
             multi-line, instead of drifting as the row's overall height
             changes. */}
         <div className="sticky bottom-4 mt-5 flex items-end gap-2 rounded-2xl border border-line-strong bg-panel p-2 shadow-lg">
-          <Select
-            aria-label="Response mode"
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            className="h-9.5 shrink-0"
-          >
-            {MODES.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.label}
-              </option>
-            ))}
-          </Select>
+          {(models?.items.length ?? 0) > 0 && (
+            <Select
+              aria-label="Model"
+              value={providerId}
+              onChange={(e) => setProviderId(e.target.value)}
+              className="h-9.5 max-w-40 shrink-0"
+            >
+              <option value="">Auto</option>
+              {(models?.items ?? []).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </Select>
+          )}
           <Composer
             onSend={submit}
             disabled={askMutation.isPending}
@@ -346,7 +352,6 @@ function AssistantMessage({
       onClick={onSelect}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Badge tone="accent">{message.mode.replace(/_/g, " ")}</Badge>
         <SegmentLegend segments={message.segments} />
         <button
           onClick={(e) => {

@@ -22,6 +22,7 @@ class AskRequest(BaseModel):
     mode: str = "direct"
     conversation_id: str | None = None
     filters: dict = Field(default_factory=dict)
+    provider_id: str | None = None
 
 
 @router.post("/ask")
@@ -31,11 +32,54 @@ def ask(body: AskRequest, user: User = Depends(get_current_user), db: Session = 
     conversation, _user_msg, assistant_msg = ask_service(
         db, user, body.query, mode=body.mode,
         conversation_id=body.conversation_id, filters=body.filters,
+        provider_id=body.provider_id,
     )
     return {
         "conversation_id": conversation.id,
         "message": message_dict(assistant_msg),
     }
+
+
+@router.get("/models")
+def list_models(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Models the caller may pick in the composer. Derived from the same
+    policy rows `resolve_provider` enforces, so the picker can never offer
+    something a request would be denied — the gates stay authoritative
+    server-side either way."""
+    from ..models import ModelPolicy, Organization
+
+    settings = get_settings()
+    org = db.get(Organization, user.org_id)
+    external_ok = bool(
+        settings.external_models_allowed
+        and (org.settings if org else {}).get("external_models_enabled", False)
+    )
+    policies = (
+        db.query(ModelPolicy)
+        .filter(ModelPolicy.org_id == user.org_id, ModelPolicy.enabled.is_(True))
+        .order_by(ModelPolicy.priority)
+        .all()
+    )
+    seen: set[str] = set()
+    items = []
+    for policy in policies:
+        provider = policy.provider
+        if not provider or not provider.enabled or provider.id in seen:
+            continue
+        if policy.department_ids and user.department_id not in policy.department_ids:
+            continue
+        if policy.role_names and not (set(policy.role_names) & user.role_names()):
+            continue
+        if provider.is_external and not external_ok:
+            continue
+        seen.add(provider.id)
+        items.append({
+            "id": provider.id,
+            "name": provider.name,
+            "model": provider.model,
+            "is_external": provider.is_external,
+        })
+    return {"items": items}
 
 
 class OnBehalfOfRequest(BaseModel):
