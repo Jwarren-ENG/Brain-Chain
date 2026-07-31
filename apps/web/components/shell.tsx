@@ -259,14 +259,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <button
-            onClick={() => setPaletteOpen(true)}
-            aria-label="Search (Command K)"
-            className="inline-flex items-center gap-2 rounded-[7px] border border-line px-2.5 py-1.5 text-xs text-ink-3 hover:border-line-strong hover:text-ink"
-          >
-            <Search className="size-3.5" />
-            <kbd className="font-mono text-[10.5px]">⌘K</kbd>
-          </button>
+          {/* ⌘K still opens the palette (key listener above); no visible
+              button — the header stays ChatGPT-minimal per Jacob. */}
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="Toggle theme"

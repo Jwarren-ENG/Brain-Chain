@@ -11,7 +11,6 @@ import { cn, hasRole } from "@/lib/utils";
 import type {
   Classification,
   DecisionInfo,
-  HomeData,
   MeetingImportResponse,
   Message,
 } from "@brainchain/shared";
@@ -41,12 +40,6 @@ export function ChatHome() {
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const hasInitializedRef = React.useRef(false);
-
-  const { data: home } = useQuery({
-    queryKey: ["home"],
-    queryFn: () => api<HomeData>("/home"),
-  });
-  const suggestedQuestions = (home?.suggested_questions ?? []).slice(0, 4);
 
   const { data: decisions } = useQuery({
     queryKey: ["decisions"],
@@ -202,19 +195,6 @@ export function ChatHome() {
               {ASSISTANT_NAME_CAPITALIZED} answers only from sources you are authorized to read,
               with citations.
             </p>
-            {suggestedQuestions.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2">
-                {suggestedQuestions.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => submit(q)}
-                    className="rounded-full border border-line px-3.5 py-1.5 text-[12.5px] text-ink-2 hover:border-accent hover:text-accent"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <div className="space-y-4">
