@@ -2,7 +2,7 @@
 
 import { api, setStoredUser, setToken } from "@/lib/api";
 import { ASSISTANT_NAME } from "@/lib/brand";
-import { cn, hasRole } from "@/lib/utils";
+import { cn, formatDate, hasRole } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileSearch,
@@ -70,10 +70,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [gearOpen, setGearOpen] = React.useState(false);
 
+  const onMeetings = pathname.startsWith("/meetings");
+  const activeMeetingId = searchParams.get("m");
+
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
     queryFn: () => api<{ items: ConversationSummary[] }>("/conversations"),
-    enabled: !!user,
+    enabled: !!user && !onMeetings,
+  });
+  const { data: sidebarMeetings } = useQuery({
+    queryKey: ["meetings"],
+    queryFn: () => api<{ items: { id: string; title: string; held_at: string | null }[] }>("/meetings"),
+    enabled: !!user && onMeetings,
   });
 
   React.useEffect(() => {
@@ -132,42 +140,87 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">BrainChain</span>
         </Link>
 
-        <button
-          onClick={goNewChat}
-          className="mb-3 flex items-center gap-2.5 rounded-[7px] border border-line px-2.5 py-[7px] text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2/60 hover:text-ink"
-        >
-          <Plus className="size-3.5" />
-          New chat
-        </button>
+        {!onMeetings ? (
+          <button
+            onClick={goNewChat}
+            className="mb-3 flex items-center gap-2.5 rounded-[7px] border border-line px-2.5 py-[7px] text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2/60 hover:text-ink"
+          >
+            <Plus className="size-3.5" />
+            New chat
+          </button>
+        ) : (
+          hasRole(user, "manager", "data_steward", "system_admin") && (
+            <Link
+              href="/meetings?import=1"
+              className="mb-3 flex items-center gap-2.5 rounded-[7px] border border-line px-2.5 py-[7px] text-[13.5px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2/60 hover:text-ink"
+            >
+              <Plus className="size-3.5" />
+              Import meeting
+            </Link>
+          )
+        )}
 
-        <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Conversation history">
-          {conversations && conversations.items.length === 0 ? (
-            <p className="px-2.5 py-2 text-[12.5px] text-ink-3">No conversations yet</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {(conversations?.items ?? []).map((conversation) => {
-                const active = conversation.id === activeConversationId;
-                return (
-                  <li key={conversation.id}>
-                    <Link
-                      href={`/?c=${conversation.id}`}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center gap-2 rounded-[7px] px-2.5 py-[7px] text-[13px] transition-colors",
-                        active
-                          ? "bg-panel-2 font-semibold text-ink"
-                          : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
-                      )}
-                    >
-                      <MessageSquare className="size-3.5 shrink-0 text-ink-3" aria-hidden />
-                      <span className="truncate">{conversation.title}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </nav>
+        {!onMeetings ? (
+          <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Conversation history">
+            {conversations && conversations.items.length === 0 ? (
+              <p className="px-2.5 py-2 text-[12.5px] text-ink-3">No conversations yet</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {(conversations?.items ?? []).map((conversation) => {
+                  const active = conversation.id === activeConversationId;
+                  return (
+                    <li key={conversation.id}>
+                      <Link
+                        href={`/?c=${conversation.id}`}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex items-center gap-2 rounded-[7px] px-2.5 py-[7px] text-[13px] transition-colors",
+                          active
+                            ? "bg-panel-2 font-semibold text-ink"
+                            : "font-normal text-ink-2 hover:bg-panel-2/60 hover:text-ink",
+                        )}
+                      >
+                        <MessageSquare className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+                        <span className="truncate">{conversation.title}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </nav>
+        ) : (
+          <nav className="flex-1 overflow-y-auto scroll-thin" aria-label="Meetings">
+            {sidebarMeetings && sidebarMeetings.items.length === 0 ? (
+              <p className="px-2.5 py-2 text-[12.5px] text-ink-3">No meetings yet</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {(sidebarMeetings?.items ?? []).map((meeting) => {
+                  const active = meeting.id === activeMeetingId;
+                  return (
+                    <li key={meeting.id}>
+                      <Link
+                        href={`/meetings?m=${meeting.id}`}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex flex-col gap-0.5 rounded-[7px] px-2.5 py-[7px] transition-colors",
+                          active
+                            ? "bg-panel-2 text-ink"
+                            : "text-ink-2 hover:bg-panel-2/60 hover:text-ink",
+                        )}
+                      >
+                        <span className={cn("truncate text-[13px]", active && "font-semibold")}>
+                          {meeting.title}
+                        </span>
+                        <span className="text-[11px] text-ink-3">{formatDate(meeting.held_at)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </nav>
+        )}
 
         <div className="space-y-0.5 border-t border-line pt-2">
           <Link

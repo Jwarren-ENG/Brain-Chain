@@ -1,9 +1,9 @@
 "use client";
 
 import { useSession } from "@/components/providers";
-import { Button, CardSkeleton, Dialog, EmptyState, ErrorState } from "@/components/ui";
+import { Button, Dialog, ErrorState, Spinner } from "@/components/ui";
 import { api, apiUpload } from "@/lib/api";
-import { ASSISTANT_NAME, ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
+import { ASSISTANT_NAME_CAPITALIZED } from "@/lib/brand";
 import { formatDate, hasRole } from "@/lib/utils";
 import type { Classification, MeetingImportResponse, MeetingInfo } from "@brainchain/shared";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -18,56 +18,82 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { ImportTranscriptDialog } from "./import-dialog";
-import { MeetingCard } from "./meeting-card";
 import { InvitePanel } from "./invite-panel";
+import { MeetingChat } from "./meeting-chat";
+import { MeetingHeader } from "./meeting-header";
 
-export default function MeetingsPage() {
+function MeetingsInner() {
   const { user } = useSession();
   const router = useRouter();
+  const params = useSearchParams();
   const queryClient = useQueryClient();
-  const [openMeeting, setOpenMeeting] = React.useState<MeetingInfo | null>(null);
-  const [reflectionOpen, setReflectionOpen] = React.useState<MeetingInfo | null>(null);
-  const [importOpen, setImportOpen] = React.useState(false);
+  const selectedId = params.get("m");
+  const [recapOpen, setRecapOpen] = React.useState(false);
+  const [reflectOpen, setReflectOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(params.get("import") === "1");
 
   const canImport = hasRole(user, "manager", "data_steward", "system_admin");
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isError, refetch } = useQuery({
     queryKey: ["meetings"],
     queryFn: () => api<{ items: MeetingInfo[] }>("/meetings"),
   });
-
   const { data: classifications } = useQuery({
     queryKey: ["gov-classifications"],
     queryFn: () => api<{ items: Classification[] }>("/governance/classifications"),
     enabled: canImport,
   });
 
+  // The sidebar (shell) links here with ?import=1; honor it after mount too.
+  React.useEffect(() => {
+    if (params.get("import") === "1") setImportOpen(true);
+  }, [params]);
+
+  const meeting = (data?.items ?? []).find((m) => m.id === selectedId) ?? null;
+
   function handleImported(result: MeetingImportResponse) {
     queryClient.invalidateQueries({ queryKey: ["meetings"] });
     router.push(`/meetings/${result.meeting.id}/review`);
   }
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-ink">
-            <CalendarDays className="size-5 text-accent" /> Meetings
-          </h1>
-          <p className="mt-1 text-sm text-ink-3">Recaps, decisions, and follow-through from every captured meeting.</p>
-        </div>
-      </header>
+  if (isError) {
+    return <ErrorState message="Couldn't load meetings. The API may be down." onRetry={() => refetch()} />;
+  }
 
-      <InvitePanel
-        importSlot={
-          canImport ? (
-            <Button onClick={() => setImportOpen(true)}>Import a recording or transcript</Button>
-          ) : null
-        }
-      />
+  return (
+    <div className="mx-auto max-w-3xl">
+      {meeting ? (
+        <>
+          <MeetingHeader
+            meeting={meeting}
+            onDetails={() => setRecapOpen(true)}
+            onReflect={() => setReflectOpen(true)}
+          />
+          <MeetingChat meeting={meeting} suggestions={suggestionsFor(meeting)} />
+        </>
+      ) : (
+        <div className="space-y-6 pt-10">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <CalendarDays className="size-8 text-accent" />
+            <h1 className="text-2xl font-semibold text-ink sm:text-[28px]">Ask about your meetings</h1>
+            <p className="max-w-md text-xs text-ink-3">
+              Pick a meeting from the sidebar to talk it through with {ASSISTANT_NAME_CAPITALIZED} —
+              what was decided, who owns what, and what's still open.
+            </p>
+          </div>
+          <InvitePanel
+            importSlot={
+              canImport ? (
+                <Button onClick={() => setImportOpen(true)}>Import a recording or transcript</Button>
+              ) : null
+            }
+          />
+        </div>
+      )}
+
       {canImport && (
         <ImportTranscriptDialog
           open={importOpen}
@@ -78,25 +104,8 @@ export default function MeetingsPage() {
         />
       )}
 
-      {isError ? (
-        <ErrorState message="Couldn't load meetings. The API may be down." onRetry={() => refetch()} />
-      ) : (
-        <div className="space-y-4">
-          {isLoading && <><CardSkeleton /><CardSkeleton /></>}
-          {data?.items.map((meeting) => (
-            <MeetingCard
-              key={meeting.id}
-              meeting={meeting}
-              onOpen={() => setOpenMeeting(meeting)}
-              onReflect={() => setReflectionOpen(meeting)}
-            />
-          ))}
-          {data && !data.items.length && <EmptyState title="No meeting memory yet" body="Import a recording or transcript to get started." />}
-        </div>
-      )}
-
-      <Dialog open={!!reflectionOpen} onClose={() => setReflectionOpen(null)} title={`Reflect on ${reflectionOpen?.title ?? "the meeting"}`}>
-        {reflectionOpen && (
+      <Dialog open={reflectOpen} onClose={() => setReflectOpen(false)} title={`Reflect on ${meeting?.title ?? "the meeting"}`}>
+        {meeting && (
           <div className="space-y-3">
             <p className="text-xs leading-relaxed text-ink-3">
               What landed well? What was left unsaid? {ASSISTANT_NAME_CAPITALIZED}{" "}
@@ -105,13 +114,13 @@ export default function MeetingsPage() {
             </p>
             <div className="grid gap-2">
               <LaunchOption
-                href={`/interviews/new?purpose=outcome_review&mode=text&meeting=${reflectionOpen.id}`}
+                href={`/interviews/new?purpose=outcome_review&mode=text&meeting=${meeting.id}`}
                 icon={<Brain className="size-4" />}
                 title="Reflect in text"
                 blurb="Named, confidential, or anonymous."
               />
               <LaunchOption
-                href={`/interviews/new?purpose=outcome_review&mode=quick_text&meeting=${reflectionOpen.id}`}
+                href={`/interviews/new?purpose=outcome_review&mode=quick_text&meeting=${meeting.id}`}
                 icon={<MessageCircleMore className="size-4" />}
                 title="Quick reflection"
                 blurb="One thought, straight to review."
@@ -121,11 +130,34 @@ export default function MeetingsPage() {
         )}
       </Dialog>
 
-      <Dialog open={!!openMeeting} onClose={() => setOpenMeeting(null)} title={openMeeting?.title ?? "Meeting recap"} wide>
-        {openMeeting && <MeetingRecap meeting={openMeeting} />}
+      <Dialog open={recapOpen} onClose={() => setRecapOpen(false)} title={meeting?.title ?? "Meeting recap"} wide>
+        {meeting && <MeetingRecap meeting={meeting} />}
       </Dialog>
     </div>
   );
+}
+
+export default function MeetingsPage() {
+  return (
+    <React.Suspense fallback={<Spinner />}>
+      <MeetingsInner />
+    </React.Suspense>
+  );
+}
+
+/* Meeting-derived suggestion chips: generic prompts always apply; extraction
+   counts add sharper ones when the capture found something to point at. */
+function suggestionsFor(meeting: MeetingInfo): string[] {
+  const extraction = meeting.extraction ?? {};
+  const out = ["Summarize this meeting", "What was decided?"];
+  if ((extraction.actions ?? extraction.action_items ?? []).length) {
+    out.push("Who owns the action items?");
+  }
+  if ((extraction.risks ?? []).length) out.push("What risks were raised?");
+  if ((extraction.questions ?? extraction.open_questions ?? []).length) {
+    out.push("What's still unresolved?");
+  }
+  return out.slice(0, 4);
 }
 
 function LaunchOption({
@@ -174,7 +206,6 @@ function MeetingRecap({ meeting }: { meeting: MeetingInfo }) {
           </div>
         </section>
       ))}
-      {!sections.some((section) => section.items.length) && <EmptyState title="No structured recap yet" />}
     </div>
   );
 }
